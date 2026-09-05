@@ -540,31 +540,39 @@ export type Database = {
       level_for_xp: { Args: { _xp: number }; Returns: number }
       record_catch: {
         Args: {
-          _mutation_key: string
-          _rarity: string
-          _species_id: string
           _wallet: string
-          _weight_kg: number
+          _weather_kind?: string
         }
         Returns: {
-          avatar_url: string | null
-          coins: number
-          created_at: string
-          display_name: string
-          fish_common: number
-          fish_epic: number
-          fish_legendary: number
-          fish_mythic: number
-          fish_rare: number
-          level: number
-          updated_at: string
-          username: string
-          wallet_address: string
-          xp: number
+          out_species_id: string
+          out_species_name: string
+          out_color: string
+          out_rarity: string
+          out_weight_kg: number
+          out_mutation_key: string
+          out_mutation_label: string
+          out_is_monster: boolean
+          out_xp_gained: number
+          out_profile: {
+            avatar_url: string | null
+            coins: number
+            created_at: string
+            display_name: string
+            fish_common: number
+            fish_epic: number
+            fish_legendary: number
+            fish_mythic: number
+            fish_rare: number
+            level: number
+            updated_at: string
+            username: string
+            wallet_address: string
+            xp: number
+          }
         }
         SetofOptions: {
           from: "*"
-          to: "profiles"
+          to: "record_catch"
           isOneToOne: true
           isSetofReturn: false
         }

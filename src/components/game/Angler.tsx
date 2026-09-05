@@ -641,7 +641,10 @@ export function Angler() {
         stopReelSound();
         playBobberSplash(1.6);
         if (st.fish) {
-          landFish(st.fish);
+          // Preview message from the client roll — landFish() will correct
+          // `last`/`totalWeight` in the store once the server confirms the
+          // real catch, so the HUD updates again if the numbers differ.
+          landFish(st.fish, useWeather.getState().kind);
           setMessage(`Caught ${st.fish.name} — ${st.fish.weight} kg!`);
         }
       }
@@ -1425,4 +1428,3 @@ function BaitOrb3D() {
     </group>
   );
 }
-

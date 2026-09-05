@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { buildAuthMessage, SIGNATURE_MAX_AGE_MS } from "./walletAuth";
 import { rpc } from "./rpc";
+import type { Tables } from "@/integrations/supabase/types";
 
 const proofSchema = z.object({
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
@@ -174,7 +175,7 @@ export interface RecordedCatch {
   mutationLabel: string;
   isMonster: boolean;
   xpGained: number;
-  profile: unknown;
+  profile: Tables<"profiles">;
 }
 
 /**
@@ -205,7 +206,7 @@ export const recordCatch = createServerFn({ method: "POST" })
       out_mutation_label: string;
       out_is_monster: boolean;
       out_xp_gained: number;
-      out_profile: unknown;
+      out_profile: Tables<"profiles">;
     };
 
     return {
@@ -220,6 +221,37 @@ export const recordCatch = createServerFn({ method: "POST" })
       xpGained: row.out_xp_gained,
       profile: row.out_profile,
     };
+  });
+
+// ---------------------------------------------------------------------------
+// TEST-ONLY: grants free coins so shop purchases can be tested end-to-end.
+// DELETE THIS ENTIRE BLOCK (and its button in ProfilePanel.tsx) BEFORE
+// PUBLIC RELEASE — it is the same shape of issue as the grantDevCoins bug
+// found in the last audit, just gated properly this time:
+//   1. Server refuses unless ENABLE_TEST_COINS=true is set in the server's
+//      own environment — never rely on the client to gate this.
+//   2. Never set ENABLE_TEST_COINS=true in a production environment.
+// Amount covers every item in the shop catalog (~8.1M coins total) with
+// headroom, so one grant is enough to test every rod/bait/boat purchase.
+// ---------------------------------------------------------------------------
+const TEST_COINS_AMOUNT = 10_000_000;
+
+export const grantTestCoins = createServerFn({ method: "POST" })
+  .validator((input: unknown) => proofSchema.parse(input))
+  .handler(async ({ data }) => {
+    if (process.env["ENABLE_TEST_COINS"] !== "true") {
+      throw new Error("Test coins are disabled on this server.");
+    }
+    const wallet = await verifyProof(data);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const updated = await supabaseAdmin
+      .from("profiles")
+      .update({ coins: TEST_COINS_AMOUNT, updated_at: new Date().toISOString() })
+      .eq("wallet_address", wallet)
+      .select()
+      .single();
+    if (updated.error) throw new Error(updated.error.message);
+    return updated.data as Tables<"profiles">;
   });
 
 /** Returns the caller's unsold fish, newest first. */

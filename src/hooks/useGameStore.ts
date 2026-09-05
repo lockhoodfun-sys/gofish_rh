@@ -8,6 +8,7 @@ import {
 } from "@/lib/fishRules";
 import { equippedRod } from "@/hooks/useRodStore";
 import { equippedBait } from "@/hooks/useBaitStore";
+import type { Profile } from "@/hooks/useProfileStore";
 
 export type Phase = "idle" | "cast" | "waiting" | "bite" | "reel" | "caught";
 
@@ -43,6 +44,14 @@ function toCatch(s: FishSpecies): FishCatch {
 /**
  * Data-driven roll: monster chance from game_config, pool filtered by the
  * active rod's weight cap, then weighted by rarity × bait × weather.
+ *
+ * IMPORTANT: this runs client-side and is now PREVIEW-ONLY. It picks which
+ * fish model bites, how long the bite window is, and drives the reel/fight
+ * animation — but it is never trusted for scoring. The authoritative catch
+ * (species/rarity/weight/mutation) is rolled independently on the server by
+ * `record_catch` (see drizzle/migrations/0005_security_fixes.sql) and is
+ * what actually gets saved. `landFish` reconciles the two once the server
+ * responds — see the comment there.
  */
 export function rollFish(weatherKind = "cerah"): FishCatch {
   const data = getFishData();
@@ -88,9 +97,15 @@ export function rollFish(weatherKind = "cerah"): FishCatch {
   return toCatch(pick);
 }
 
-/** Fire-and-forget profile counter sync. Never blocks or breaks gameplay. */
-function syncCatchToProfile(f: FishCatch) {
-  const rarity: Rarity = f.isMonster ? "mythic" : ((f.rarity ?? "common") as Rarity);
+/**
+ * Records the catch server-side and reconciles the store with the
+ * authoritative result. `onSettled` receives the true catch (or null if the
+ * save failed, e.g. no wallet proof or cooldown rejection) so the caller can
+ * correct anything it displayed optimistically (score/weight/toast message).
+ * Never throws — errors are surfaced via toast, and `onSettled(null)` still
+ * fires so the caller can roll back its optimistic UI update.
+ */
+function syncCatchToProfile(weatherKind: string, onSettled: (result: FishCatch | null) => void) {
   void (async () => {
     try {
       const { useProfileStore } = await import("@/hooks/useProfileStore");
@@ -98,25 +113,31 @@ function syncCatchToProfile(f: FishCatch) {
       if (!proof) {
         const { toast } = await import("sonner");
         toast.error("Catch not saved — connect your wallet and sign to sync your profile.");
+        onSettled(null);
         return;
       }
       const { recordCatch } = await import("@/lib/profile.functions");
-      const profile = await recordCatch({
-        data: {
-          proof,
-          rarity,
-          speciesId: f.speciesId,
-          weightKg: f.weight,
-          mutationKey: f.mutationKey,
-        },
-      });
-      if (profile) useProfileStore.getState().setProfile(profile);
+      const result = await recordCatch({ data: { proof, weatherKind } });
+      if (result.profile) {
+        useProfileStore.getState().setProfile(result.profile as Profile);
+      }
       const { useInventoryStore } = await import("@/hooks/useInventoryStore");
       await useInventoryStore.getState().refresh();
+      onSettled({
+        speciesId: result.speciesId,
+        name: result.speciesName,
+        mutationKey: result.mutationKey,
+        mutationLabel: result.mutationLabel,
+        weight: result.weightKg,
+        color: result.color,
+        rarity: result.rarity,
+        isMonster: result.isMonster,
+      });
     } catch (error) {
       const { toast } = await import("sonner");
       const message = error instanceof Error ? error.message : "Unknown error";
       toast.error(`Could not save your catch: ${message}`);
+      onSettled(null);
     }
   })();
 }
@@ -136,7 +157,14 @@ interface GameStore {
   toggleRodStowed: () => void;
   setBagOpen: (v: boolean) => void;
   toggleBag: () => void;
-  landFish: (f: FishCatch) => void;
+  /**
+   * `f` is the client's preview roll, used to update score/weight/last
+   * immediately so the HUD feels instant. It is then reconciled against the
+   * server's authoritative catch once `record_catch` responds — if the two
+   * differ (independent rolls) or the save fails outright, the store is
+   * corrected in place. `weatherKind` is advisory-only server-side.
+   */
+  landFish: (f: FishCatch, weatherKind?: string) => void;
 }
 
 export const useGameStore = create<GameStore>((set) => ({
@@ -153,15 +181,32 @@ export const useGameStore = create<GameStore>((set) => ({
   toggleRodStowed: () => set((s) => ({ rodStowed: !s.rodStowed })),
   setBagOpen: (bagOpen) => set({ bagOpen }),
   toggleBag: () => set((s) => ({ bagOpen: !s.bagOpen })),
-  landFish: (f) => {
-    syncCatchToProfile(f);
+  landFish: (f, weatherKind = "cerah") => {
+    // Optimistic update from the client's preview roll — keeps the HUD
+    // (score, weight, "Caught X" message) feeling instant.
     set((s) => ({
       score: s.score + 1,
       totalWeight: Number((s.totalWeight + f.weight).toFixed(2)),
       last: f,
     }));
+    syncCatchToProfile(weatherKind, (result) => {
+      if (result) {
+        // Server truth may differ from the preview roll (independent RNG) —
+        // swap the optimistic weight/last for the authoritative values.
+        // Only fish actually persisted server-side ever affect the wallet
+        // economy, so this is what must be shown as the "real" catch.
+        set((s) => ({
+          totalWeight: Number((s.totalWeight - f.weight + result.weight).toFixed(2)),
+          last: result,
+        }));
+      } else {
+        // Save failed (no proof, cooldown rejection, network error, etc.) —
+        // roll back the optimistic score/weight bump entirely.
+        set((s) => ({
+          score: Math.max(0, s.score - 1),
+          totalWeight: Number(Math.max(0, s.totalWeight - f.weight).toFixed(2)),
+        }));
+      }
+    });
   },
 }));
-
-
-
