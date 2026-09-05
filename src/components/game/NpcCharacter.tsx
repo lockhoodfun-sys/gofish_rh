@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import * as THREE from "three";
-import type { FaceKind, NpcOutfit } from "./npcs";
+import type { FaceKind, NpcOutfit } from "./npcData";
 
 /** Roblox-like faces drawn on a transparent canvas texture. */
 function makeFace(kind: FaceKind) {

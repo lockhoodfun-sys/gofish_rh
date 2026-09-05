@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { player } from "@/hooks/usePlayer";
 import { groundAround } from "@/lib/worldPhysics";
 import { useNpc } from "@/hooks/useNpc";
-import { NPCS, type NpcDef } from "./npcs";
+import { NPCS, type NpcDef } from "./npcData";
 import { NpcCharacter } from "./NpcCharacter";
 
 const NPC_SCALE = 2.5;

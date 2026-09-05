@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { X, Coins, Fish as FishIcon, Loader2, Store } from "lucide-react";
 import { useNpc } from "@/hooks/useNpc";
-import { npcById } from "./npcs";
+import { npcById } from "./npcData";
 import { useProfileStore } from "@/hooks/useProfileStore";
 import { getFishData, mutationFor, priceFor } from "@/lib/fishRules";
 import { sellFish } from "@/lib/profile.functions";
