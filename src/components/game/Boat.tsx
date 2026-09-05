@@ -18,7 +18,23 @@ import { useBoatStore } from "@/hooks/useBoatStore";
 import { boatLook } from "@/lib/boatModels";
 
 /** Equipped hull, auto-centred, auto-scaled and laid bow-forward (+z). */
-function BoatModel({ url, targetLength }: { url: string; targetLength: number }) {
+function BoatModel({
+  url,
+  targetLength,
+  helmZFactor = 0.55,
+  helmXFactor = 0,
+  helmYOffset = 0,
+  deckYFactor = 0.14,
+  flipBow = false,
+}: {
+  url: string;
+  targetLength: number;
+  helmZFactor?: number;
+  helmXFactor?: number;
+  helmYOffset?: number;
+  deckYFactor?: number;
+  flipBow?: boolean;
+}) {
   const { scene } = useGLTF(url, "/draco/");
   const model = useMemo(() => {
     const TARGET_LENGTH = targetLength;
@@ -55,11 +71,12 @@ function BoatModel({ url, targetLength }: { url: string; targetLength: number })
 
     const wrapper = new THREE.Group();
     if (alongX) wrapper.rotation.y = Math.PI / 2;
+    if (flipBow) wrapper.rotation.y += Math.PI;
     wrapper.add(inner);
     // keep the hull bottom just above the waterline so the sea never shows inside
     wrapper.position.y = -size.y * s * 0.05;
     // seat the rider on the interior floor
-    const deckY = wrapper.position.y + size.y * s * 0.14;
+    const deckY = wrapper.position.y + size.y * s * deckYFactor + helmYOffset;
     BOAT_SEAT.y = deckY;
     // walkable deck box measured from the hull footprint (keep clear of the rails)
     const beam = (alongX ? size.z : size.x) * s;
@@ -68,10 +85,11 @@ function BoatModel({ url, targetLength }: { url: string; targetLength: number })
     boat.deck.halfZ = Math.max(0.9, (hullLen / 2) * 0.6) / BOAT_SCALE;
     boat.deck.y = deckY;
     // helm sits toward the stern; keep it inside the deck box
-    BOAT_SEAT.z = -boat.deck.halfZ * 0.55;
+    BOAT_SEAT.z = -boat.deck.halfZ * helmZFactor;
+    BOAT_SEAT.x = boat.deck.halfX * helmXFactor;
     resetDeckOffset();
     return wrapper;
-  }, [scene, targetLength]);
+  }, [scene, targetLength, helmZFactor, helmXFactor, helmYOffset, deckYFactor, flipBow]);
 
   return <primitive object={model} />;
 }
@@ -480,7 +498,16 @@ export function Boat() {
     <group>
       <group ref={group} scale={BOAT_SCALE}>
         <Suspense fallback={null}>
-          <BoatModel key={look.id} url={look.url} targetLength={look.targetLength} />
+          <BoatModel
+            key={look.id}
+            url={look.url}
+            targetLength={look.targetLength}
+            helmZFactor={look.helmZFactor}
+            helmXFactor={look.helmXFactor}
+            helmYOffset={look.helmYOffset}
+            deckYFactor={look.deckYFactor}
+            flipBow={look.flipBow}
+          />
         </Suspense>
 
 
