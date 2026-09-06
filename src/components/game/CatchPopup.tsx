@@ -1,6 +1,5 @@
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import * as THREE from "three";
 import { useGameStore } from "@/hooks/useGameStore";
 import { useHookedFish } from "@/hooks/useHookedFish";
 import { playCatchSuccessSound } from "@/lib/weatherAudio";
@@ -26,13 +25,11 @@ const RARITY_BOOST: Record<Rarity, number> = {
   mythic: 1.6,
 };
 
-/** Slow trophy-shot spin, independent of FishModel's own little swim wiggle. */
+/** Static mount for the fish portrait — no auto-rotation, so the model
+ *  always renders at its normalised, centered pose (front-on to the
+ *  portrait camera) and can't drift off-centre inside its own frame. */
 function Spinner({ children }: { children: React.ReactNode }) {
-  const g = useRef<THREE.Group>(null);
-  useFrame((_, dt) => {
-    if (g.current) g.current.rotation.y += dt * 0.6;
-  });
-  return <group ref={g}>{children}</group>;
+  return <group>{children}</group>;
 }
 
 /** World-unit body length FishModel normalises each rarity's GLB to (see
@@ -88,9 +85,8 @@ const T_RAYS_START = T_FLASH_START; // rays shoot out with the flash
 const T_RAYS_DUR = 380;
 const T_FISH_START = T_FLASH_START + 30; // fish pops right as the flash hits
 const T_FISH_DUR = 280;
-const T_ODDS_START = T_FISH_START + 150; // "1 in X", 150ms after the fish
-const T_ODDS_DUR = 250;
-const T_NAME_START = T_ODDS_START + 80; // name+weight, 80ms after that
+const T_ODDS_START = T_FISH_START + 150; // name+weight timing still keys off this offset
+const T_NAME_START = T_ODDS_START + 80; // name+weight, 80ms after the fish pop
 const T_NAME_DUR = 250;
 const T_GLOW_FADE_DUR = 1300; // glow's own build+hold+fade, from T_GLOW_START
 // Impact-layer DOM (glow/flash/rays/sparkles) is torn down after this —
@@ -328,12 +324,19 @@ export function CatchPopup() {
         </div>
       )}
 
-      {/* fish portrait — the hero element, stays hidden until its pop */}
+      {/* fish portrait — the hero element, stays hidden until its pop.
+          Nudged right (translateX) to counter the fish models' consistent
+          visual bias: the bounding-box centering is geometrically correct,
+          but a round head + thin tail puts more visual "weight" on one
+          side, so the silhouette reads as off-centre even though its pivot
+          isn't. Shrunk from the old 220px tall box to cut the dead space
+          between the fish and the name text below it. */}
       <div
         key={`portrait-${catchKey}`}
-        className="h-[220px] w-[260px]"
+        className="h-[170px] w-[260px]"
         style={{
           opacity: visible ? undefined : 0,
+          transform: "translateX(28px)",
           animation: visible
             ? `catchFishPop ${T_FISH_DUR}ms cubic-bezier(0.22, 1.2, 0.36, 1) ${T_FISH_START}ms both`
             : undefined,
@@ -342,36 +345,38 @@ export function CatchPopup() {
         <FishPortrait isMonster={!!current.isMonster} />
       </div>
 
-      {current.oddsOneIn && (
-        <p
-          key={`odds-${catchKey}`}
-          className="-mt-3 text-2xl font-extrabold text-lime-400"
-          style={{
-            WebkitTextStroke: "2px black",
-            textShadow: "0 2px 0 rgba(0,0,0,0.6)",
-            opacity: visible ? undefined : 0,
-            animation: visible
-              ? `catchTextReveal ${T_ODDS_DUR}ms ease-out ${T_ODDS_START}ms both`
-              : undefined,
-          }}
-        >
-          1 in {current.oddsOneIn}
-        </p>
-      )}
-      <p
+      <div
         key={`name-${catchKey}`}
-        className="text-xl font-extrabold text-white"
+        className="-mt-6 flex flex-col items-center text-white"
         style={{
-          WebkitTextStroke: "1.5px black",
-          textShadow: "0 2px 0 rgba(0,0,0,0.6)",
+          fontFamily: "'Fredoka', sans-serif",
           opacity: visible ? undefined : 0,
           animation: visible
             ? `catchTextReveal ${T_NAME_DUR}ms ease-out ${T_NAME_START}ms both`
             : undefined,
         }}
       >
-        {current.name} ({current.weight}kg)
-      </p>
+        <p
+          className="text-2xl leading-tight"
+          style={{
+            fontWeight: 700,
+            WebkitTextStroke: "1.5px black",
+            textShadow: "0 2px 0 rgba(0,0,0,0.6)",
+          }}
+        >
+          {current.name}
+        </p>
+        <p
+          className="text-lg leading-tight"
+          style={{
+            fontWeight: 600,
+            WebkitTextStroke: "1px black",
+            textShadow: "0 2px 0 rgba(0,0,0,0.6)",
+          }}
+        >
+          {current.weight}kg
+        </p>
+      </div>
 
       <style>{`
         @keyframes catchScreenPunch {
