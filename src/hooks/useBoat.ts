@@ -5,7 +5,7 @@ import * as THREE from "three";
  * scene, the angler and the wake effect can all read it every frame without
  * re-rendering.
  */
-export const BOAT_MOORING = new THREE.Vector3(22.6, 0, 73.2);
+export const BOAT_MOORING = new THREE.Vector3(10, 0, 113);
 
 export const boat = {
   pos: BOAT_MOORING.clone(),

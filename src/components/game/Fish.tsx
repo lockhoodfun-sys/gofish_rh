@@ -11,7 +11,19 @@ import {
 } from "@/lib/fishModels";
 
 /** Loads one GLB, centres it, and normalises it to the requested length. */
-function FishModel({ def, size }: { def: FishModelDef; size: number }) {
+function FishModel({
+  def,
+  size,
+  animate = true,
+}: {
+  def: FishModelDef;
+  size: number;
+  /** Set false for a static "product shot" pose (e.g. the catch popup
+   *  portrait) — skips the idle swim wag so the silhouette doesn't drift
+   *  off its normalised centre as it rotates. Defaults true so every
+   *  existing caller (the line-hanging fish) keeps swimming as before. */
+  animate?: boolean;
+}) {
   const { scene } = useGLTF(def.url, "/draco/");
   const model = useMemo(() => {
     const root = scene.clone(true);
@@ -40,11 +52,10 @@ function FishModel({ def, size }: { def: FishModelDef; size: number }) {
 
   const swim = useRef<THREE.Group>(null);
   useFrame((state) => {
+    if (!animate || !swim.current) return;
     const t = state.clock.elapsedTime;
-    if (swim.current) {
-      swim.current.rotation.z = Math.sin(t * 9) * 0.14;
-      swim.current.rotation.y = Math.sin(t * 6) * 0.1;
-    }
+    swim.current.rotation.z = Math.sin(t * 9) * 0.14;
+    swim.current.rotation.y = Math.sin(t * 6) * 0.1;
   });
 
   return (
@@ -62,10 +73,13 @@ export function FishMesh({
   color = "#e8a04a",
   scale = 1,
   wagSpeed = 18,
+  animate = true,
 }: {
   color?: string;
   scale?: number;
   wagSpeed?: number;
+  /** Set false for a static, non-swimming pose (see FishModel). */
+  animate?: boolean;
 }) {
   const model = useHookedFish((s) => s.model);
   const rarity = useHookedFish((s) => s.rarity);
@@ -75,7 +89,7 @@ export function FishMesh({
 
   return (
     <Suspense fallback={null}>
-      <FishModel def={def} size={size} />
+      <FishModel def={def} size={size} animate={animate} />
     </Suspense>
   );
 }

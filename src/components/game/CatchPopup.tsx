@@ -39,6 +39,12 @@ function Spinner({ children }: { children: React.ReactNode }) {
 const MONSTER_LENGTH = 4;
 const TARGET_LEN = 2.0;
 const TARGET_LEN_MONSTER = 3.2;
+/** Magnitude (px) of the facing-based centring correction applied to the
+ *  portrait below — see the comment on the portrait div for why the sign
+ *  is driven by the model's `facing` instead of being fixed. Tune this
+ *  single number if fish still read slightly off-centre; it applies to
+ *  every species the same amount, just mirrored by direction. */
+const PORTRAIT_NUDGE_PX = 28;
 
 /** Mini self-contained 3D viewport that renders the caught species as a
  *  floating "product shot" portrait — reuses the exact same GLB loader/
@@ -62,9 +68,9 @@ function FishPortrait({ isMonster }: { isMonster: boolean }) {
       <Suspense fallback={null}>
         <Spinner>
           {isMonster ? (
-            <MonsterFishMesh scale={scale} wagSpeed={1.4} />
+            <MonsterFishMesh scale={scale} wagSpeed={1.4} animate={false} />
           ) : (
-            <FishMesh scale={scale} wagSpeed={10} />
+            <FishMesh scale={scale} wagSpeed={10} animate={false} />
           )}
         </Spinner>
       </Suspense>
@@ -160,6 +166,14 @@ function makeSparkles(seed: number): Sparkle[] {
 export function CatchPopup() {
   const phase = useGameStore((s) => s.phase);
   const current = useGameStore((s) => s.current);
+  // Which way THIS fish's model faces after normalisation (see FishModelDef.facing
+  // in fishModels.ts, already curated per-GLB from visual testing) — a torpedo-
+  // shaped body puts more visual "weight" on the head side, so the silhouette's
+  // apparent centre leans toward whichever way it's facing. Using this instead of
+  // a single fixed direction is why the same popup can correct BOTH a fish that
+  // leans left (facing -1, e.g. Mackerel) AND one that leans right (facing +1,
+  // e.g. Scad) without needing a per-species special case.
+  const facing = useHookedFish((s) => s.model?.facing ?? -1);
   const [catchKey, setCatchKey] = useState(0);
   const [impactAlive, setImpactAlive] = useState(false);
   const prevPhase = useRef(phase);
@@ -325,24 +339,41 @@ export function CatchPopup() {
       )}
 
       {/* fish portrait — the hero element, stays hidden until its pop.
-          Nudged right (translateX) to counter the fish models' consistent
-          visual bias: the bounding-box centering is geometrically correct,
-          but a round head + thin tail puts more visual "weight" on one
-          side, so the silhouette reads as off-centre even though its pivot
-          isn't. Shrunk from the old 220px tall box to cut the dead space
-          between the fish and the name text below it. */}
+          animate={false} is passed to FishMesh/MonsterFishMesh inside
+          FishPortrait so the model holds its normalised, bounding-box-
+          centred pose instead of continuously wagging. That still leaves
+          a small residual bias: a fish's silhouette (bulky head, thin
+          tail) reads as heavier toward whichever way it's facing, even
+          though the bounding-box centre is geometrically correct.
+          PORTRAIT_NUDGE_PX is a small, symmetric correction whose
+          DIRECTION flips with the model's own `facing` (curated
+          per-species in fishModels.ts) — not a fixed guess, so it
+          self-corrects for both left-facing and right-facing species
+          instead of only ever fixing one of them.
+          IMPORTANT: this offset lives on its OWN wrapper div, separate
+          from the one running the catchFishPop scale animation below —
+          a CSS animation on `transform` fully overrides any static
+          `transform` on that same element for as long as it applies
+          (fill-mode both holds it before/after too), so putting the
+          nudge on the animated div would have silently done nothing. */}
       <div
         key={`portrait-${catchKey}`}
         className="h-[170px] w-[260px]"
         style={{
           opacity: visible ? undefined : 0,
-          transform: "translateX(28px)",
-          animation: visible
-            ? `catchFishPop ${T_FISH_DUR}ms cubic-bezier(0.22, 1.2, 0.36, 1) ${T_FISH_START}ms both`
-            : undefined,
+          transform: `translateX(${current.isMonster ? 0 : -facing * PORTRAIT_NUDGE_PX}px)`,
         }}
       >
-        <FishPortrait isMonster={!!current.isMonster} />
+        <div
+          className="h-full w-full"
+          style={{
+            animation: visible
+              ? `catchFishPop ${T_FISH_DUR}ms cubic-bezier(0.22, 1.2, 0.36, 1) ${T_FISH_START}ms both`
+              : undefined,
+          }}
+        >
+          <FishPortrait isMonster={!!current.isMonster} />
+        </div>
       </div>
 
       <div

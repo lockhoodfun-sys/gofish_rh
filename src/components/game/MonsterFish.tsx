@@ -11,7 +11,16 @@ const MONSTER_URL = "/models/fish_mythic_3.glb";
 /** Body length in world units at scale = 1. */
 const MONSTER_LENGTH = 4;
 
-function MonsterModel({ scale, wagSpeed }: { scale: number; wagSpeed: number }) {
+function MonsterModel({
+  scale,
+  wagSpeed,
+  animate = true,
+}: {
+  scale: number;
+  wagSpeed: number;
+  /** Set false for a static "product shot" pose (catch popup portrait). */
+  animate?: boolean;
+}) {
   const { scene } = useGLTF(MONSTER_URL, "/draco/");
   const model = useMemo(() => {
     const root = scene.clone(true);
@@ -38,11 +47,10 @@ function MonsterModel({ scale, wagSpeed }: { scale: number; wagSpeed: number }) 
 
   const swim = useRef<THREE.Group>(null);
   useFrame((state) => {
+    if (!animate || !swim.current) return;
     const t = state.clock.elapsedTime;
-    if (swim.current) {
-      swim.current.rotation.z = Math.sin(t * wagSpeed) * 0.16;
-      swim.current.rotation.y = Math.sin(t * wagSpeed * 0.7) * 0.12;
-    }
+    swim.current.rotation.z = Math.sin(t * wagSpeed) * 0.16;
+    swim.current.rotation.y = Math.sin(t * wagSpeed * 0.7) * 0.12;
   });
 
   return (
@@ -56,13 +64,16 @@ function MonsterModel({ scale, wagSpeed }: { scale: number; wagSpeed: number }) 
 export function MonsterFishMesh({
   scale = 1,
   wagSpeed = 1.6,
+  animate = true,
 }: {
   scale?: number;
   wagSpeed?: number;
+  /** Set false for a static, non-swimming pose (see MonsterModel). */
+  animate?: boolean;
 }) {
   return (
     <Suspense fallback={null}>
-      <MonsterModel scale={scale} wagSpeed={wagSpeed} />
+      <MonsterModel scale={scale} wagSpeed={wagSpeed} animate={animate} />
     </Suspense>
   );
 }
