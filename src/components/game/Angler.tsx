@@ -10,6 +10,8 @@ import {
   animateUnderwaterGlow,
   UNDERWATER_GLOW_COLOR,
   MONSTER_GLOW_COLOR,
+  CatchAscendGlowMesh,
+  animateCatchAscend,
 } from "./UnderwaterFishGlow";
 import { rollFish, useGameStore, type FishCatch } from "@/hooks/useGameStore";
 import { equippedRod, useRodStore } from "@/hooks/useRodStore";
@@ -51,7 +53,6 @@ const SWIM_HEAD_LOCAL_Y = 4.25;
 /** how far the head pokes above the water surface when floating upright */
 const SWIM_SURFACE_EMERGE = 0.65;
 
-
 const lerp = THREE.MathUtils.lerp;
 const damp = (cur: number, target: number, k: number, dt: number) =>
   lerp(cur, target, 1 - Math.exp(-k * dt));
@@ -59,8 +60,6 @@ const damp = (cur: number, target: number, k: number, dt: number) =>
 /** Offset mulut monster relatif pusat model (lokal x≈1.6, y≈-0.05) × scale 9. */
 const MONSTER_SCALE = 9;
 const MONSTER_MOUTH = new THREE.Vector3(1.6, -0.05, 0).multiplyScalar(MONSTER_SCALE);
-
-
 
 /** Roblox-style blocky avatar holding a fishing rod. */
 export function Angler() {
@@ -84,6 +83,11 @@ export function Angler() {
   /** underwater light VFX standing in for the (hidden) fish while it's
    *  being reeled in — see UnderwaterFishGlow.tsx */
   const underGlow = useRef<THREE.Group>(null);
+  /** the catch-ascension surge — the fish's light bursting up out of the
+   *  water and racing along the line to the rod tip, replacing the old
+   *  3D fish dangle for a normal (non-monster) catch — see
+   *  CatchAscendGlowMesh in UnderwaterFishGlow.tsx */
+  const ascendGlow = useRef<THREE.Group>(null);
   const reelCrank = useRef<THREE.Group>(null);
   /** brief warm glow at the rod tip/hands the instant a catch lands — see
    *  the "PULL" step of the catch-impact sequence (CatchPopup handles the
@@ -114,15 +118,8 @@ export function Angler() {
     return l;
   }, []);
 
-
   const s = useRef({
-    phase: "idle" as
-      | "idle"
-      | "cast"
-      | "waiting"
-      | "bite"
-      | "reel"
-      | "caught",
+    phase: "idle" as "idle" | "cast" | "waiting" | "bite" | "reel" | "caught",
     t: 0,
     biteAt: 3,
     bobber: new THREE.Vector3(player.pos.x, 0, player.pos.z + 1),
@@ -138,7 +135,6 @@ export function Angler() {
     /** posisi & rotasi pusat monster (dihitung di fase reel/caught) */
     monsterPos: new THREE.Vector3(),
     monsterRot: new THREE.Euler(),
-
 
     splashT: 99,
     whizzed: false,
@@ -345,10 +341,7 @@ export function Angler() {
       const nx = dirX / len;
       const nz = dirZ / len;
       const mv = player.swimming ? SWIM_SPEED : WALK_SPEED;
-      const [cx, cz] = clampToWalkable(
-        player.pos.x + nx * mv * dt,
-        player.pos.z + nz * mv * dt,
-      );
+      const [cx, cz] = clampToWalkable(player.pos.x + nx * mv * dt, player.pos.z + nz * mv * dt);
       player.pos.x = cx;
       player.pos.z = cz;
       player.yaw = Math.atan2(nx, nz);
@@ -398,35 +391,28 @@ export function Angler() {
       st.stepPhase = Math.floor(st.walk / Math.PI);
     }
 
-
     // ---- body transform: stand at the player position -------------------
     if (body.current) {
       const bob = boat.driving
         ? 0
         : player.swimming
-        ? Math.sin(t * 2.4) * 0.16
-        : speed > 0
-          ? Math.abs(Math.sin(st.walk)) * 0.09
-          : Math.sin(t * 1.6) * 0.05;
+          ? Math.sin(t * 2.4) * 0.16
+          : speed > 0
+            ? Math.abs(Math.sin(st.walk)) * 0.09
+            : Math.sin(t * 1.6) * 0.05;
       // pose renang: badan tetap tegak & tenggelam (hanya kepala di atas air),
       // sedikit condong ke depan saat bergerak — tidak diangkat/terapung
-      const swimPitch =
-        player.swimming && !boat.riding ? (speed > 0 ? 0.22 : 0.05) : 0;
+      const swimPitch = player.swimming && !boat.riding ? (speed > 0 ? 0.22 : 0.05) : 0;
       body.current.rotation.order = "YXZ";
       body.current.rotation.x = damp(body.current.rotation.x, swimPitch, 6, dt);
-      body.current.position.set(
-        player.pos.x,
-        player.pos.y + bob,
-        player.pos.z,
-      );
+      body.current.position.set(player.pos.x, player.pos.y + bob, player.pos.z);
       // shortest-path yaw smoothing
       let diff = player.yaw - body.current.rotation.y;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       body.current.rotation.y += diff * (1 - Math.exp(-12 * dt));
     }
-    if (head.current)
-      head.current.rotation.y = speed > 0 ? 0 : Math.sin(t * 0.42) * 0.18;
+    if (head.current) head.current.rotation.y = speed > 0 ? 0 : Math.sin(t * 0.42) * 0.18;
 
     // ---- walking legs ---------------------------------------------------
     // swimming: continuous flutter kick, slightly wider than the walk cycle
@@ -442,8 +428,10 @@ export function Angler() {
     const targetR = boat.driving ? seatSwing : -legSwing;
     if (legL.current) legL.current.rotation.x = damp(legL.current.rotation.x, targetL, 12, dt);
     if (legR.current) legR.current.rotation.x = damp(legR.current.rotation.x, targetR, 12, dt);
-    if (legL.current) legL.current.rotation.z = damp(legL.current.rotation.z, boat.driving ? 0.12 : 0, 12, dt);
-    if (legR.current) legR.current.rotation.z = damp(legR.current.rotation.z, boat.driving ? -0.12 : 0, 12, dt);
+    if (legL.current)
+      legL.current.rotation.z = damp(legL.current.rotation.z, boat.driving ? 0.12 : 0, 12, dt);
+    if (legR.current)
+      legR.current.rotation.z = damp(legR.current.rotation.z, boat.driving ? -0.12 : 0, 12, dt);
 
     let armR = -0.35; // shoulder pitch (+ = arm swings back, - = forward)
     let armRZ = 0; // right shoulder roll (+ = moves the hand inward toward center)
@@ -463,6 +451,10 @@ export function Angler() {
     // underwater glow only ever lights up during the "reel" branch below;
     // default it off so it can't linger into any other phase.
     if (underGlow.current) underGlow.current.visible = false;
+    // catch-ascension surge only ever lights up in the "caught" branch
+    // below, and only for normal (non-monster) catches; default it off
+    // so it can't linger into any other phase.
+    if (ascendGlow.current) ascendGlow.current.visible = false;
 
     if (st.phase === "cast") {
       const p = st.t;
@@ -490,7 +482,6 @@ export function Angler() {
         rodAbs = lerp(-0.4, 1.05, e);
         bend = Math.sin(k * Math.PI) * 0.6;
         lean = lerp(0.16, -0.16, e);
-
       } else {
         // 3) settle: rod pointing out over the water
         const k = Math.min((p - 0.78) / 0.5, 1);
@@ -503,8 +494,6 @@ export function Angler() {
       armRZ = lerp(0, 0.38, grip);
       armL = lerp(-0.5, -1.15, grip);
       armLZ = lerp(-0.1, -0.55, grip);
-
-
 
       // bobber flight starts at the whip release
       if (p >= 0.66) {
@@ -645,8 +634,7 @@ export function Angler() {
         // hanya bergejolak kecil di sekitar titik kail
         st.bobber.x = st.to.x + Math.sin(st.t * 14) * 0.45 * (1 - k * 0.5);
         st.bobber.z = st.to.z + Math.cos(st.t * 11) * 0.45 * (1 - k * 0.5);
-        st.bobber.y =
-          waterHeight(st.to.x, st.to.z, t) - 0.25 + Math.abs(Math.sin(st.t * 9)) * 0.35;
+        st.bobber.y = waterHeight(st.to.x, st.to.z, t) - 0.25 + Math.abs(Math.sin(st.t * 9)) * 0.35;
         // cipratan fight berulang di titik sambaran
         if (st.splashT > 0.45) {
           st.splashT = 0;
@@ -697,7 +685,6 @@ export function Angler() {
           setMessage(`Caught ${st.fish.name} — ${st.fish.weight} kg!`);
         }
       }
-
     } else if (st.phase === "caught") {
       const isMonster = !!st.fish?.isMonster;
       if (isMonster) {
@@ -726,11 +713,7 @@ export function Angler() {
         // pusat monster ditempatkan dari mulut: mulut selalu di ujung senar
         {
           const dirA = Math.atan2(st.bobber.z - player.pos.z, st.bobber.x - player.pos.x);
-          st.monsterRot.set(
-            0,
-            Math.PI - dirA,
-            0.15 + kk * 0.85 + Math.sin(t * 3) * 0.06,
-          );
+          st.monsterRot.set(0, Math.PI - dirA, 0.15 + kk * 0.85 + Math.sin(t * 3) * 0.06);
           st.monsterPos
             .copy(MONSTER_MOUTH)
             .applyEuler(st.monsterRot)
@@ -745,7 +728,6 @@ export function Angler() {
           burst.current.position.set(st.from.x, st.from.y + 0.25, st.from.z);
           animateBurst(burst.current, kb, t);
         }
-
 
         // rod bent to the limit, character leans way back
         armR = lerp(-1.1, -2.0, Math.min(kk * 2.2, 1));
@@ -809,16 +791,37 @@ export function Angler() {
             const e = 1 - Math.pow(1 - kk, 3);
             st.bobber.x = st.to.x;
             st.bobber.z = st.to.z;
-            st.bobber.y = lerp(
-              waterHeight(st.to.x, st.to.z, t) - 0.2,
-              tmp.y,
-              e,
-            );
+            st.bobber.y = lerp(waterHeight(st.to.x, st.to.z, t) - 0.2, tmp.y, e);
           } else {
             // 2) ikan di udara mengikuti ujung joran yang diangkat
             st.bobber.lerp(tmp, 1 - Math.exp(-6 * dt));
           }
         }
+
+        // ---- catch-ascension surge: the fish's own light bursting up
+        // out of the water and racing up the line toward the rod tip,
+        // standing in for the (now popup-only) fish model. Tracks
+        // st.bobber's full path — including the later horizontal drift
+        // toward the rod tip and the triumphant-lift hold — so the light
+        // never detaches from where the "fish" actually is. Stays lit
+        // for essentially the whole "caught" sequence, only fading in
+        // the last stretch so the finish doesn't cut off abruptly. ----
+        if (ascendGlow.current) {
+          const surf = waterHeight(st.bobber.x, st.bobber.z, t);
+          ascendGlow.current.visible = true;
+          ascendGlow.current.position.set(st.bobber.x, surf, st.bobber.z);
+          const h = st.bobber.y - surf;
+          const ascendProgress = k; // spans the full 1.9s "caught" duration
+          const rarity = (st.fish?.rarity ?? "common") as Rarity;
+          animateCatchAscend(
+            ascendGlow.current,
+            t,
+            h,
+            ascendProgress,
+            UNDERWATER_GLOW_COLOR[rarity] ?? UNDERWATER_GLOW_COLOR.common,
+          );
+        }
+
         if (k >= 1) {
           st.phase = "idle";
           st.t = 0;
@@ -882,12 +885,7 @@ export function Angler() {
         // convert torso-space rod tilt into a local rotation relative to the arm
         const shoulder = rightArm.current ? rightArm.current.rotation.x : armR;
         const spine = torso.current ? torso.current.rotation.x : lean;
-        rod.current.rotation.x = damp(
-          rod.current.rotation.x,
-          rodAbs - shoulder - spine,
-          18,
-          dt,
-        );
+        rod.current.rotation.x = damp(rod.current.rotation.x, rodAbs - shoulder - spine, 18, dt);
         // Counter-rotate the child rod so moving the right hand inward does not
         // alter the rod's established sideways angle.
         const shoulderRoll = rightArm.current ? rightArm.current.rotation.z : armRZ;
@@ -895,12 +893,11 @@ export function Angler() {
       }
     }
 
-    if (rodBend.current) rodBend.current.rotation.x = damp(rodBend.current.rotation.x, bend, 14, dt);
+    if (rodBend.current)
+      rodBend.current.rotation.x = damp(rodBend.current.rotation.x, bend, 14, dt);
 
     // sembunyikan senar & pelampung saat joran dilepas
     lineObj.visible = !stowed;
-
-
 
     // ---- bobber ------------------------------------------------------
     if (bobber.current) {
@@ -927,7 +924,6 @@ export function Angler() {
         monster.current.position.copy(st.monsterPos);
         monster.current.rotation.copy(st.monsterRot);
       }
-
     }
 
     // ---- fishing line: spool -> guide rings -> rod tip -> catenary ke bobber
@@ -948,11 +944,12 @@ export function Angler() {
       }
       pos.setXYZ(idx, tipWorld.x, tipWorld.y, tipWorld.z);
       idx++;
-    const sag =
-      st.phase === "reel" || st.phase === "bite" ||
-      (st.phase === "caught" && !!st.fish?.isMonster)
-        ? 0.12
-        : 0.8;
+      const sag =
+        st.phase === "reel" ||
+        st.phase === "bite" ||
+        (st.phase === "caught" && !!st.fish?.isMonster)
+          ? 0.12
+          : 0.8;
       for (let i = 0; i < CURVE_SEGS; i++) {
         const k = (i + 1) / CURVE_SEGS;
         const x = lerp(tipWorld.x, st.bobber.x, k);
@@ -964,7 +961,6 @@ export function Angler() {
       pos.needsUpdate = true;
     }
 
-
     // ---- splash particles ------------------------------------------------
     st.splashT += dt;
     if (splash.current) {
@@ -975,7 +971,11 @@ export function Angler() {
         splash.current.children.forEach((c, i) => {
           const a = (i / splash.current!.children.length) * Math.PI * 2;
           const r = life * 1.9;
-          c.position.set(Math.cos(a) * r, Math.sin(life * Math.PI) * 1.7 - life * 0.3, Math.sin(a) * r);
+          c.position.set(
+            Math.cos(a) * r,
+            Math.sin(life * Math.PI) * 1.7 - life * 0.3,
+            Math.sin(a) * r,
+          );
           const sc = Math.max(0.001, (1 - life) * 0.3);
           c.scale.setScalar(sc);
         });
@@ -1099,7 +1099,12 @@ export function Angler() {
               <meshStandardMaterial color={hair} roughness={0.6} />
             </mesh>
             {[-0.42, -0.14, 0.14, 0.42].map((x, i) => (
-              <mesh key={x} position={[x, 0.92 + (i % 2) * 0.1, 0.12 - (i % 2) * 0.2]} rotation={[0.2, 0, x * 0.4]} castShadow>
+              <mesh
+                key={x}
+                position={[x, 0.92 + (i % 2) * 0.1, 0.12 - (i % 2) * 0.2]}
+                rotation={[0.2, 0, x * 0.4]}
+                castShadow
+              >
                 <boxGeometry args={[0.24, 0.36, 0.3]} />
                 <meshStandardMaterial color={hair} roughness={0.6} />
               </mesh>
@@ -1121,7 +1126,6 @@ export function Angler() {
             </mesh>
           </group>
 
-
           {/* left arm (character's left = +X side) */}
           <group ref={leftArm} position={[1.5, 3.5, 0]}>
             <mesh position={[0, -0.5, 0]} castShadow>
@@ -1140,7 +1144,6 @@ export function Angler() {
 
           {/* right arm + rod (character's right = -X side) */}
           <group ref={rightArm} position={[-1.5, 3.5, 0]}>
-
             <mesh position={[0, -0.5, 0]} castShadow>
               <boxGeometry args={[0.92, 1.1, 0.92]} />
               <meshStandardMaterial color={sleeve} roughness={0.7} />
@@ -1154,186 +1157,198 @@ export function Angler() {
               <meshStandardMaterial color={skin} roughness={0.75} />
             </mesh>
 
-
             <group ref={handAnchor} position={[0, -1.6, 0.2]}>
-            <group ref={rod}>
-              {/* grip — bentuk & ketebalan khas tiap tier */}
-              <mesh position={[0, 0.35, 0]} castShadow>
-                {look.shape === "carved" || look.shape === "ornate" ? (
-                  <cylinderGeometry
-                    args={[look.gripRadius * 0.85, look.gripRadius * 1.15, 1.1, 6]}
-                  />
-                ) : look.shape === "ethereal" ? (
-                  <capsuleGeometry args={[look.gripRadius, 0.8, 4, 10]} />
-                ) : (
-                  <cylinderGeometry
-                    args={[look.gripRadius * 0.9, look.gripRadius, 1.1, look.shape === "wood" ? 6 : 12]}
-                  />
-                )}
-                <meshStandardMaterial
-                  color={look.grip}
-                  roughness={look.shape === "wood" ? 1 : 0.55}
-                  metalness={look.shape === "slim" || look.shape === "ethereal" ? 0.5 : 0.1}
-                  emissive={look.accent}
-                  emissiveIntensity={look.glow * 0.3}
-                />
-              </mesh>
-              {/* ornamen permata di sepanjang pegangan */}
-              {Array.from({ length: look.gems }, (_, i) => (
-                <mesh
-                  key={i}
-                  position={[0, 0.05 + i * (0.55 / Math.max(1, look.gems)), look.gripRadius]}
-                  castShadow
-                >
-                  <octahedronGeometry args={[0.045 + look.glow * 0.02, 0]} />
+              <group ref={rod}>
+                {/* grip — bentuk & ketebalan khas tiap tier */}
+                <mesh position={[0, 0.35, 0]} castShadow>
+                  {look.shape === "carved" || look.shape === "ornate" ? (
+                    <cylinderGeometry
+                      args={[look.gripRadius * 0.85, look.gripRadius * 1.15, 1.1, 6]}
+                    />
+                  ) : look.shape === "ethereal" ? (
+                    <capsuleGeometry args={[look.gripRadius, 0.8, 4, 10]} />
+                  ) : (
+                    <cylinderGeometry
+                      args={[
+                        look.gripRadius * 0.9,
+                        look.gripRadius,
+                        1.1,
+                        look.shape === "wood" ? 6 : 12,
+                      ]}
+                    />
+                  )}
                   <meshStandardMaterial
-                    color={look.accent}
+                    color={look.grip}
+                    roughness={look.shape === "wood" ? 1 : 0.55}
+                    metalness={look.shape === "slim" || look.shape === "ethereal" ? 0.5 : 0.1}
                     emissive={look.accent}
-                    emissiveIntensity={0.4 + look.glow}
-                    metalness={0.6}
-                    roughness={0.2}
+                    emissiveIntensity={look.glow * 0.3}
                   />
                 </mesh>
-              ))}
-              {/* sayap/ekor ornamen khas tier tinggi */}
-              {(look.shape === "ornate" || look.shape === "ethereal") && (
-                <>
-                  {[-1, 1].map((sgn) => (
-                    <mesh
-                      key={sgn}
-                      position={[sgn * 0.16, 0.95, 0]}
-                      rotation={[0, 0, sgn * 0.5]}
-                      castShadow
-                    >
-                      <coneGeometry args={[0.07, 0.34, look.shape === "ethereal" ? 4 : 3]} />
-                      <meshStandardMaterial
-                        color={look.accent}
-                        emissive={look.accent}
-                        emissiveIntensity={look.glow}
-                        metalness={0.7}
-                        roughness={0.25}
-                      />
-                    </mesh>
-                  ))}
-                </>
-              )}
-              {look.shape === "ethereal" && (
-                <mesh position={[0, 0.9, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                  <torusGeometry args={[0.3, 0.012, 6, 28]} />
-                  <meshBasicMaterial color={look.accent} transparent opacity={0.6} />
-                </mesh>
-              )}
-
-              {/* reel */}
-              <mesh position={[0.28, 0.75, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-                <cylinderGeometry args={[0.24, 0.24, 0.28, 12]} />
-                <meshStandardMaterial
-                  color={look.accent}
-                  metalness={0.7}
-                  roughness={0.3}
-                  emissive={look.accent}
-                  emissiveIntensity={look.glow}
-                />
-              </mesh>
-              {/* reel crank handle (spins while reeling) */}
-              <group ref={reelCrank} position={[0.44, 0.75, 0]} rotation={[0, 0, Math.PI / 2]}>
-                <mesh position={[0, 0, 0.18]} castShadow>
-                  <boxGeometry args={[0.06, 0.06, 0.36]} />
-                  <meshStandardMaterial color="#e0b64a" metalness={0.6} roughness={0.4} />
-                </mesh>
-                <mesh position={[0.1, 0, 0.34]} castShadow>
-                  <cylinderGeometry args={[0.07, 0.07, 0.2, 8]} />
-                  <meshStandardMaterial color="#3a2a1c" roughness={0.9} />
-                </mesh>
-              </group>
-              {/* titik keluar senar dari spool reel */}
-              <object3D ref={(o) => (guideRefs.current[0] = o)} position={[0.2, 0.9, 0]} />
-              {/* flexible upper blank */}
-              <group ref={rodBend} position={[0, 0.9, 0]}>
-                <mesh position={[0, 1.5, 0]} castShadow>
-                  <cylinderGeometry
-                    args={[
-                      look.blankRadius[1],
-                      look.blankRadius[0],
-                      3,
-                      look.shape === "wood" ? 6 : look.shape === "carved" ? 5 : 10,
-                    ]}
-                  />
-                  <meshStandardMaterial
-                    color={look.blank}
-                    roughness={look.shape === "wood" ? 0.9 : 0.4}
-                    metalness={look.shape === "slim" || look.shape === "ethereal" ? 0.55 : 0.1}
-                    emissive={look.accent}
-                    emissiveIntensity={look.glow * 0.5}
-                  />
-                </mesh>
-                {/* lilitan/ukiran khas tier */}
-                {(look.shape === "fiber" || look.shape === "carved" || look.shape === "ornate") &&
-                  [0.4, 1.1, 1.8, 2.5].map((y, i) => (
-                    <mesh key={i} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-                      <torusGeometry args={[look.blankRadius[0] * 1.05, 0.014, 6, 12]} />
-                      <meshStandardMaterial
-                        color={look.accent}
-                        metalness={0.6}
-                        roughness={0.35}
-                        emissive={look.accent}
-                        emissiveIntensity={look.glow * 0.6}
-                      />
-                    </mesh>
-                  ))}
-
-                {/* ring guide bawah */}
-                <group position={[0.12, 1.0, 0]}>
-                  <object3D ref={(o) => (guideRefs.current[1] = o)} />
-                  <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-                    <torusGeometry args={[0.055, 0.016, 6, 10]} />
-                    <meshStandardMaterial color={look.accent} metalness={0.7} roughness={0.35} />
-                  </mesh>
-                </group>
-                <group position={[0.1, 2.2, 0]}>
-                  <object3D ref={(o) => (guideRefs.current[2] = o)} />
-                  <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-                    <torusGeometry args={[0.048, 0.014, 6, 10]} />
-                    <meshStandardMaterial color={look.accent} metalness={0.7} roughness={0.35} />
-                  </mesh>
-                </group>
-                <group position={[0, 3, 0]} rotation-x={0.22}>
-                  <mesh position={[0, 1.1, 0]} castShadow>
-                    <cylinderGeometry args={[0.025, 0.055, 2.2, 8]} />
+                {/* ornamen permata di sepanjang pegangan */}
+                {Array.from({ length: look.gems }, (_, i) => (
+                  <mesh
+                    key={i}
+                    position={[0, 0.05 + i * (0.55 / Math.max(1, look.gems)), look.gripRadius]}
+                    castShadow
+                  >
+                    <octahedronGeometry args={[0.045 + look.glow * 0.02, 0]} />
                     <meshStandardMaterial
-                      color={look.tip}
-                      roughness={0.5}
+                      color={look.accent}
                       emissive={look.accent}
-                      emissiveIntensity={look.glow * 0.7}
+                      emissiveIntensity={0.4 + look.glow}
+                      metalness={0.6}
+                      roughness={0.2}
                     />
                   </mesh>
-                  <group position={[0.08, 0.8, 0]}>
-                    <object3D ref={(o) => (guideRefs.current[3] = o)} />
-                    <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-                      <torusGeometry args={[0.04, 0.012, 6, 10]} />
-                      <meshStandardMaterial color={look.accent} metalness={0.7} roughness={0.35} />
-                    </mesh>
-                  </group>
-                  <group position={[0.06, 1.7, 0]}>
-                    <object3D ref={(o) => (guideRefs.current[4] = o)} />
-                    <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-                      <torusGeometry args={[0.034, 0.01, 6, 10]} />
-                      <meshStandardMaterial color={look.accent} metalness={0.7} roughness={0.35} />
-                    </mesh>
-                  </group>
+                ))}
+                {/* sayap/ekor ornamen khas tier tinggi */}
+                {(look.shape === "ornate" || look.shape === "ethereal") && (
+                  <>
+                    {[-1, 1].map((sgn) => (
+                      <mesh
+                        key={sgn}
+                        position={[sgn * 0.16, 0.95, 0]}
+                        rotation={[0, 0, sgn * 0.5]}
+                        castShadow
+                      >
+                        <coneGeometry args={[0.07, 0.34, look.shape === "ethereal" ? 4 : 3]} />
+                        <meshStandardMaterial
+                          color={look.accent}
+                          emissive={look.accent}
+                          emissiveIntensity={look.glow}
+                          metalness={0.7}
+                          roughness={0.25}
+                        />
+                      </mesh>
+                    ))}
+                  </>
+                )}
+                {look.shape === "ethereal" && (
+                  <mesh position={[0, 0.9, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                    <torusGeometry args={[0.3, 0.012, 6, 28]} />
+                    <meshBasicMaterial color={look.accent} transparent opacity={0.6} />
+                  </mesh>
+                )}
 
-                  <object3D ref={rodTip} position={[0, 2.2, 0]} />
-                  <pointLight
-                    ref={rodGlow}
-                    position={[0, 2.2, 0]}
-                    color="#fff3c4"
-                    intensity={0}
-                    distance={5}
-                    decay={2}
+                {/* reel */}
+                <mesh position={[0.28, 0.75, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+                  <cylinderGeometry args={[0.24, 0.24, 0.28, 12]} />
+                  <meshStandardMaterial
+                    color={look.accent}
+                    metalness={0.7}
+                    roughness={0.3}
+                    emissive={look.accent}
+                    emissiveIntensity={look.glow}
                   />
+                </mesh>
+                {/* reel crank handle (spins while reeling) */}
+                <group ref={reelCrank} position={[0.44, 0.75, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <mesh position={[0, 0, 0.18]} castShadow>
+                    <boxGeometry args={[0.06, 0.06, 0.36]} />
+                    <meshStandardMaterial color="#e0b64a" metalness={0.6} roughness={0.4} />
+                  </mesh>
+                  <mesh position={[0.1, 0, 0.34]} castShadow>
+                    <cylinderGeometry args={[0.07, 0.07, 0.2, 8]} />
+                    <meshStandardMaterial color="#3a2a1c" roughness={0.9} />
+                  </mesh>
+                </group>
+                {/* titik keluar senar dari spool reel */}
+                <object3D ref={(o) => (guideRefs.current[0] = o)} position={[0.2, 0.9, 0]} />
+                {/* flexible upper blank */}
+                <group ref={rodBend} position={[0, 0.9, 0]}>
+                  <mesh position={[0, 1.5, 0]} castShadow>
+                    <cylinderGeometry
+                      args={[
+                        look.blankRadius[1],
+                        look.blankRadius[0],
+                        3,
+                        look.shape === "wood" ? 6 : look.shape === "carved" ? 5 : 10,
+                      ]}
+                    />
+                    <meshStandardMaterial
+                      color={look.blank}
+                      roughness={look.shape === "wood" ? 0.9 : 0.4}
+                      metalness={look.shape === "slim" || look.shape === "ethereal" ? 0.55 : 0.1}
+                      emissive={look.accent}
+                      emissiveIntensity={look.glow * 0.5}
+                    />
+                  </mesh>
+                  {/* lilitan/ukiran khas tier */}
+                  {(look.shape === "fiber" || look.shape === "carved" || look.shape === "ornate") &&
+                    [0.4, 1.1, 1.8, 2.5].map((y, i) => (
+                      <mesh key={i} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+                        <torusGeometry args={[look.blankRadius[0] * 1.05, 0.014, 6, 12]} />
+                        <meshStandardMaterial
+                          color={look.accent}
+                          metalness={0.6}
+                          roughness={0.35}
+                          emissive={look.accent}
+                          emissiveIntensity={look.glow * 0.6}
+                        />
+                      </mesh>
+                    ))}
+
+                  {/* ring guide bawah */}
+                  <group position={[0.12, 1.0, 0]}>
+                    <object3D ref={(o) => (guideRefs.current[1] = o)} />
+                    <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+                      <torusGeometry args={[0.055, 0.016, 6, 10]} />
+                      <meshStandardMaterial color={look.accent} metalness={0.7} roughness={0.35} />
+                    </mesh>
+                  </group>
+                  <group position={[0.1, 2.2, 0]}>
+                    <object3D ref={(o) => (guideRefs.current[2] = o)} />
+                    <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+                      <torusGeometry args={[0.048, 0.014, 6, 10]} />
+                      <meshStandardMaterial color={look.accent} metalness={0.7} roughness={0.35} />
+                    </mesh>
+                  </group>
+                  <group position={[0, 3, 0]} rotation-x={0.22}>
+                    <mesh position={[0, 1.1, 0]} castShadow>
+                      <cylinderGeometry args={[0.025, 0.055, 2.2, 8]} />
+                      <meshStandardMaterial
+                        color={look.tip}
+                        roughness={0.5}
+                        emissive={look.accent}
+                        emissiveIntensity={look.glow * 0.7}
+                      />
+                    </mesh>
+                    <group position={[0.08, 0.8, 0]}>
+                      <object3D ref={(o) => (guideRefs.current[3] = o)} />
+                      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+                        <torusGeometry args={[0.04, 0.012, 6, 10]} />
+                        <meshStandardMaterial
+                          color={look.accent}
+                          metalness={0.7}
+                          roughness={0.35}
+                        />
+                      </mesh>
+                    </group>
+                    <group position={[0.06, 1.7, 0]}>
+                      <object3D ref={(o) => (guideRefs.current[4] = o)} />
+                      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+                        <torusGeometry args={[0.034, 0.01, 6, 10]} />
+                        <meshStandardMaterial
+                          color={look.accent}
+                          metalness={0.7}
+                          roughness={0.35}
+                        />
+                      </mesh>
+                    </group>
+
+                    <object3D ref={rodTip} position={[0, 2.2, 0]} />
+                    <pointLight
+                      ref={rodGlow}
+                      position={[0, 2.2, 0]}
+                      color="#fff3c4"
+                      intensity={0}
+                      distance={5}
+                      decay={2}
+                    />
+                  </group>
                 </group>
               </group>
-            </group>
             </group>
           </group>
         </group>
@@ -1379,6 +1394,12 @@ export function Angler() {
           surface — no fish geometry is rendered during "reel" */}
       <group ref={underGlow} visible={false}>
         <UnderwaterFishGlowMesh />
+      </group>
+
+      {/* catch-ascension surge: the fish's light bursting up out of the
+          water and racing up the line to the rod tip on a normal catch */}
+      <group ref={ascendGlow} visible={false}>
+        <CatchAscendGlowMesh />
       </group>
     </group>
   );
@@ -1434,7 +1455,11 @@ function BaitOrb3D() {
           </mesh>
           <mesh position={[0.11, -0.08, 0]} rotation={[0, 0, -0.6]} castShadow>
             <octahedronGeometry args={[0.07, 0]} />
-            <meshStandardMaterial color={look.shell} emissive={look.accent} emissiveIntensity={look.glow * 0.6} />
+            <meshStandardMaterial
+              color={look.shell}
+              emissive={look.accent}
+              emissiveIntensity={look.glow * 0.6}
+            />
           </mesh>
         </>
       )}
