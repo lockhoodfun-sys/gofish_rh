@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Coins, Loader2 } from "lucide-react";
+import { Coins, Loader2, Backpack as BackpackIcon } from "lucide-react";
+import { toast } from "sonner";
 import { useInventoryStore } from "@/hooks/useInventoryStore";
 import { useProfileStore } from "@/hooks/useProfileStore";
 import { useRodStore } from "@/hooks/useRodStore";
 import { useBaitStore } from "@/hooks/useBaitStore";
 import { useBoatStore } from "@/hooks/useBoatStore";
+import { useHotbarFishStore, MAX_HOTBAR_FISH } from "@/hooks/useHotbarFishStore";
 import { useFishThumbnail } from "@/hooks/useFishThumbnail";
 import { useBoatThumbnail } from "@/hooks/useBoatThumbnail";
 import { getFishData, mutationFor, priceFor } from "@/lib/fishRules";
@@ -39,8 +41,7 @@ function speciesInfo(id: string) {
  *  SCROLL_AREA is a *fixed* height (not max-height): tabs with few items
  *  (2 rods) must occupy the same vertical space as tabs with many (153
  *  fish), or the whole panel resizes every time the player switches tabs. */
-const CARD_SHELL =
-  "flex flex-col rounded-2xl border p-2.5 transition-colors";
+const CARD_SHELL = "flex flex-col rounded-2xl border p-2.5 transition-colors";
 const IMAGE_BOX = "flex h-24 items-center justify-center rounded-xl";
 const SCROLL_AREA = "h-80 overflow-y-auto pr-1 scrollbar-none";
 const GRID = "grid grid-cols-2 gap-2.5 content-start";
@@ -139,6 +140,8 @@ function FishTab() {
   const items = useInventoryStore((s) => s.items);
   const loading = useInventoryStore((s) => s.loading);
   const proof = useProfileStore((s) => s.proof);
+  const hotbarSlots = useHotbarFishStore((s) => s.slots);
+  const addToHotbar = useHotbarFishStore((s) => s.addToHotbar);
   const totalKg = items.reduce((a, b) => a + b.weight_kg, 0);
   const totalValue = items.reduce(
     (a, b) => a + priceFor(b.species_id, b.weight_kg, b.mutation_key),
@@ -182,15 +185,38 @@ function FishTab() {
               const mutation = mutationFor(item.mutation_key);
               const value = priceFor(item.species_id, item.weight_kg, item.mutation_key);
               const ring = RARITY_RING[info.rarity] ?? RARITY_RING.common;
+              const inHotbar = hotbarSlots.some((s) => s.id === item.id);
               return (
-                <div
+                <button
                   key={item.id}
-                  className={`${CARD_SHELL} relative border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] hover:border-white/25`}
+                  type="button"
+                  onClick={() => {
+                    const reason = addToHotbar(item);
+                    if (reason === "duplicate") {
+                      toast.info("Already in your hotbar.");
+                    } else if (reason === "full") {
+                      toast.error(
+                        `Hotbar is full (max ${MAX_HOTBAR_FISH} fish). Remove one first.`,
+                      );
+                    } else {
+                      toast.success(`${info.name} added to hotbar.`);
+                    }
+                  }}
+                  className={`${CARD_SHELL} relative w-full text-left transition-colors ${
+                    inHotbar
+                      ? "border-amber-300/80 bg-amber-300/10"
+                      : "border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] hover:border-white/25"
+                  }`}
                 >
                   <span className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-bold text-amber-300 backdrop-blur-sm">
                     <Coins size={11} />
                     {value.toLocaleString()}
                   </span>
+                  {inHotbar && (
+                    <span className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[11px] font-bold text-slate-950">
+                      <BackpackIcon size={11} /> Hotbar
+                    </span>
+                  )}
 
                   {/* Image cell: oversized and nudged up so it never crowds the text below. */}
                   <div
@@ -218,7 +244,7 @@ function FishTab() {
                       {item.weight_kg.toFixed(2)} kg
                     </p>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -229,7 +255,7 @@ function FishTab() {
 }
 
 /** Bag icon: the real GLB model, falling back to the stylised fish while it renders. */
-function FishThumbnail({
+export function FishThumbnail({
   color,
   rarity,
   size = "sm",
@@ -528,9 +554,7 @@ export function BagPanel() {
             type="button"
             onClick={() => setTab(t.id)}
             className={`flex-1 rounded-full py-1.5 text-xs font-bold transition-colors ${
-              tab === t.id
-                ? "bg-emerald-500 text-slate-950"
-                : "text-slate-300 hover:bg-white/5"
+              tab === t.id ? "bg-emerald-500 text-slate-950" : "text-slate-300 hover:bg-white/5"
             }`}
           >
             {t.label}

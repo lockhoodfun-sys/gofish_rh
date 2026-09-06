@@ -15,12 +15,14 @@ import {
 } from "./UnderwaterFishGlow";
 import { rollFish, useGameStore, type FishCatch } from "@/hooks/useGameStore";
 import { equippedRod, useRodStore } from "@/hooks/useRodStore";
+import { useHotbarFishStore } from "@/hooks/useHotbarFishStore";
+import { RarityFishMesh } from "./Fish";
 
 import { rodLook } from "@/lib/rodLooks";
 import { clampToWalkable, isInWater, player, resolvePlayerGround } from "@/hooks/usePlayer";
 import { boat, boatDeckWorld, moveOnDeck } from "@/hooks/useBoat";
 import { useWeather } from "@/hooks/useWeather";
-import { biteWindowFor, type Rarity } from "@/lib/fishRules";
+import { biteWindowFor, getFishData, type Rarity } from "@/lib/fishRules";
 
 import { useBaitStore } from "@/hooks/useBaitStore";
 import { baitLook } from "@/lib/baitLooks";
@@ -74,6 +76,17 @@ export function Angler() {
   const head = useRef<THREE.Group>(null);
   const rod = useRef<THREE.Group>(null);
   const look = rodLook(useRodStore((s) => s.equippedId));
+  const heldFishId = useHotbarFishStore((s) => s.heldId);
+  const hotbarFishSlots = useHotbarFishStore((s) => s.slots);
+  const heldFishItem = heldFishId
+    ? (hotbarFishSlots.find((it) => it.id === heldFishId) ?? null)
+    : null;
+  const heldFishRarity: Rarity =
+    (heldFishItem &&
+      (getFishData().species.find((sp) => sp.id === heldFishItem.species_id)?.rarity as
+        Rarity | undefined)) ||
+    "common";
+  const heldFishAnchor = useRef<THREE.Group>(null);
   const rodBend = useRef<THREE.Group>(null);
   const rodTip = useRef<THREE.Object3D>(null);
   const bobber = useRef<THREE.Group>(null);
@@ -862,6 +875,20 @@ export function Angler() {
       bend = 0;
     }
 
+    // ---- ikan diangkat di atas kepala (hotbar) --------------------------
+    // Butuh kedua tangan bebas, jadi hanya berlaku saat idle & joran sudah
+    // tersampir (Hotbar.tsx menyampirkan joran otomatis sebelum set heldId).
+    const holdingFish = !!useHotbarFishStore.getState().heldId && st.phase === "idle" && stowed;
+    if (holdingFish) {
+      armR = -2.9;
+      armRZ = 0.05;
+      armL = -2.75;
+      armLZ = -0.05;
+      bend = 0;
+      lean = -0.08 + Math.sin(t * 1.6) * 0.015;
+    }
+    if (heldFishAnchor.current) heldFishAnchor.current.visible = holdingFish;
+
     // ---- apply pose (smoothed) ----------------------------------------
     if (speed > 0) {
       armL += -legSwing * 0.55;
@@ -1073,6 +1100,24 @@ export function Angler() {
 
           {/* anchor punggung: joran menyilang di belakang badan saat dilepas */}
           <group ref={backAnchor} position={[-0.62, 1.85, -0.66]} rotation={[-0.2, 0, -0.5]} />
+
+          {/* ikan hotbar yang sedang diangkat kedua tangan di atas kepala */}
+          <group
+            ref={heldFishAnchor}
+            position={[0, 4.3, 0.35]}
+            rotation={[0.08, 0, 0]}
+            visible={false}
+          >
+            {heldFishItem && (
+              <RarityFishMesh
+                rarity={heldFishRarity}
+                weightKg={heldFishItem.weight_kg}
+                modelKey={heldFishItem.id}
+                animate={false}
+                anchorBottom
+              />
+            )}
+          </group>
           {/* head */}
           <group ref={head} position={[0, 4.25, 0]}>
             <mesh castShadow>
