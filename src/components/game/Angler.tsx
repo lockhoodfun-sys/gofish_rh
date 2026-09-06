@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import * as THREE from "three";
 import { waterHeight } from "./Ocean";
-import { FishMesh } from "./Fish";
 import { MonsterFishMesh } from "./MonsterFish";
 import { MonsterBurstMesh, animateBurst } from "./MonsterBurst";
 import { rollFish, useGameStore, type FishCatch } from "@/hooks/useGameStore";
@@ -59,7 +58,7 @@ const MONSTER_MOUTH = new THREE.Vector3(1.6, -0.05, 0).multiplyScalar(MONSTER_SC
 
 /** Roblox-style blocky avatar holding a fishing rod. */
 export function Angler() {
-  const { setPhase, setMessage, landFish } = useGameStore.getState();
+  const { setPhase, setMessage, landFish, setCurrent } = useGameStore.getState();
 
   const body = useRef<THREE.Group>(null);
   const torso = useRef<THREE.Group>(null);
@@ -73,7 +72,6 @@ export function Angler() {
   const rodBend = useRef<THREE.Group>(null);
   const rodTip = useRef<THREE.Object3D>(null);
   const bobber = useRef<THREE.Group>(null);
-  const hooked = useRef<THREE.Group>(null);
   const monster = useRef<THREE.Group>(null);
   const splash = useRef<THREE.Group>(null);
   const burst = useRef<THREE.Group>(null);
@@ -184,6 +182,7 @@ export function Angler() {
       st.whizzed = false;
       st.fish = null;
       useHookedFish.getState().clear();
+      setCurrent(null);
       setPhase("cast");
       setMessage("Casting...");
     } else if (st.phase === "bite") {
@@ -529,6 +528,7 @@ export function Angler() {
         st.t = 0;
         st.fish = rollFish(useWeather.getState().kind);
         useHookedFish.getState().hook(st.fish.rarity, st.fish.weight);
+        setCurrent(st.fish);
         setPhase("bite");
         setMessage("FISH ON! Press SPACE / ENTER now!");
       }
@@ -550,6 +550,7 @@ export function Angler() {
         st.t = 0;
         st.fish = null;
         useHookedFish.getState().clear();
+        setCurrent(null);
         setPhase("idle");
         setMessage("It got away! Cast again.");
       }
@@ -844,22 +845,19 @@ export function Angler() {
 
 
 
-    // ---- bobber + hooked fish ------------------------------------------
+    // ---- bobber ------------------------------------------------------
     if (bobber.current) {
       bobber.current.position.copy(st.bobber);
       bobber.current.visible = st.phase !== "caught" && !stowed;
     }
     const isMonster = !!st.fish?.isMonster;
-    if (hooked.current) {
-      const show = st.phase === "caught" && !isMonster;
-      hooked.current.visible = show;
-      if (show) {
-        hooked.current.position.copy(st.bobber);
-        hooked.current.position.y -= 0.35;
-        // dangling and flopping in the air
-        hooked.current.rotation.set(0, Math.PI * 0.5, -Math.PI / 2 + Math.sin(t * 12) * 0.55);
-      }
-    }
+    // NOTE: the regular hooked-fish 3D dangle (position/rotation matched to
+    // the hook point) was removed in favour of CatchPopup — a 2D overlay
+    // card that renders the caught species' GLB as a floating portrait with
+    // odds/name/weight text, shown from the moment of the bite through to
+    // the reveal. No more per-model facing/mouth-anchor math needed for
+    // regular catches. The monster's own epic lift sequence below is
+    // untouched — it's a distinct set-piece, not the "wrong position" bug.
     // ---- monster raksasa: diangkat epik mengikuti senar ----------
     if (monster.current) {
       // Selama perlawanan hanya senar dan cipratan yang terlihat. Monster
@@ -1290,11 +1288,6 @@ export function Angler() {
           <meshStandardMaterial color="#f7f7f2" roughness={0.4} />
         </mesh>
         <BaitOrb3D />
-      </group>
-
-      {/* hooked fish */}
-      <group ref={hooked} visible={false}>
-        <FishMesh color="#e8a04a" scale={1} wagSpeed={18} />
       </group>
 
       {/* monster raksasa saat tertangkap */}

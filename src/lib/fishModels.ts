@@ -5,6 +5,14 @@ export interface FishModelDef {
   url: string;
   /** Target body length in world units once auto-normalised. */
   length: number;
+  /**
+   * Which local X direction the model's head faces after FishModel's
+   * auto-centre/auto-rotate normalisation (see Fish.tsx). Not every GLB was
+   * authored facing the same way, so this is set per-file from visual
+   * testing rather than assumed globally. +1 = head at local +X (same
+   * convention as the monster's dedicated asset), -1 = head at local -X.
+   */
+  facing: 1 | -1;
 }
 
 /**
@@ -28,17 +36,31 @@ export const SIZE_MULTIPLIER: Record<Rarity, number> = {
 const len = (rarity: Rarity) => BASE_LENGTH * SIZE_MULTIPLIER[rarity];
 
 export const FISH_MODELS: Record<Rarity, FishModelDef[]> = {
-  common: [{ url: "/models/fish_common.glb", length: len("common") }],
-  rare: [{ url: "/models/fish_rare.glb", length: len("rare") }],
-  epic: [{ url: "/models/fish_epic.glb", length: len("epic") }],
+  // Confirmed correct facing -X.
+  common: [{ url: "/models/fish_common.glb", length: len("common"), facing: -1 }],
+  rare: [{ url: "/models/fish_rare.glb", length: len("rare"), facing: -1 }],
+  // Confirmed backward with -X -> these face +X instead (same convention
+  // as the monster's dedicated asset).
+  epic: [{ url: "/models/fish_epic.glb", length: len("epic"), facing: 1 }],
   legendary: [
-    { url: "/models/fish_legendary_1.glb", length: len("legendary") },
-    { url: "/models/fish_legendary_2.glb", length: len("legendary") },
+    { url: "/models/fish_legendary_1.glb", length: len("legendary"), facing: 1 },
+    { url: "/models/fish_legendary_2.glb", length: len("legendary"), facing: 1 },
   ],
+  // fish_mythic_3.glb is intentionally NOT listed here: it's reserved
+  // exclusively for MonsterFishMesh (the Ancient Leviathan). That model
+  // is only ever positioned via the dedicated MONSTER_MOUTH anchor logic
+  // in Angler.tsx (mouth-to-hook alignment, epic lift arc, giant scale).
+  // The generic hooked-fish pose used for every other rarity assumes a
+  // normal-sized fish and does NOT match this model's proportions —
+  // if it's picked here for an ordinary mythic catch (Baby Tuna), it
+  // renders through the wrong pipeline and ends up floating in the
+  // wrong place/orientation near the dock instead of hanging properly.
+  // Confirmed correct facing -X (only verified via whichever of the two
+  // random variants surfaced during testing — flag the other one if it
+  // still turns out backward).
   mythic: [
-    { url: "/models/fish_mythic_1.glb", length: len("mythic") },
-    { url: "/models/fish_mythic_2.glb", length: len("mythic") },
-    { url: "/models/fish_mythic_3.glb", length: len("mythic") },
+    { url: "/models/fish_mythic_1.glb", length: len("mythic"), facing: -1 },
+    { url: "/models/fish_mythic_2.glb", length: len("mythic"), facing: -1 },
   ],
 };
 

@@ -11,6 +11,7 @@ import { Boat } from "./Boat";
 import { FishSchool } from "./Fish";
 import { Angler } from "./Angler";
 import { HUD } from "./HUD";
+import { CatchPopup } from "./CatchPopup";
 import { Hotbar } from "./Hotbar";
 import { LoadingScreen } from "./LoadingScreen";
 import { StartGate } from "./StartGate";
@@ -156,6 +157,7 @@ export function GameCanvas() {
 
       </Canvas>
       <HUD />
+      <CatchPopup />
       <Hotbar />
       <WorldEditor />
       <LoadingScreen />

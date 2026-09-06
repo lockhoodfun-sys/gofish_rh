@@ -21,6 +21,8 @@ export interface FishCatch {
   color: string;
   rarity?: Rarity | null;
   isMonster?: boolean;
+  /** "1 in N" drop odds for the species that was picked, client-preview only. */
+  oddsOneIn?: number;
 }
 
 function rollWeight(s: FishSpecies) {
@@ -42,23 +44,26 @@ function toCatch(s: FishSpecies): FishCatch {
 }
 
 /**
- * Data-driven roll: monster chance from game_config, pool filtered by the
- * active rod's weight cap, then weighted by rarity × bait × weather.
+ * Data-driven roll: pool filtered by the active rod's weight cap, then
+ * weighted by rarity × bait × weather. Monster species are NOT special
+ * cased — they compete in the same weighted pool as everything else, so
+ * they only ever surface once a rod's max_catch_weight_kg clears their
+ * min_weight_kg (currently only the Mythic Rod clears Ancient Leviathan).
+ * This mirrors record_catch()'s server-side pool exactly (see
+ * drizzle/migrations/0006_fix_monster_roll_gating.sql) — previously this
+ * function pre-rolled a flat 2% monster chance regardless of rod cap,
+ * which meant even a Starter Rod would play the "monster bite" animation
+ * ~2% of casts even though the server could never actually award it.
  *
- * IMPORTANT: this runs client-side and is now PREVIEW-ONLY. It picks which
+ * IMPORTANT: this runs client-side and is PREVIEW-ONLY. It picks which
  * fish model bites, how long the bite window is, and drives the reel/fight
  * animation — but it is never trusted for scoring. The authoritative catch
  * (species/rarity/weight/mutation) is rolled independently on the server by
- * `record_catch` (see drizzle/migrations/0005_security_fixes.sql) and is
- * what actually gets saved. `landFish` reconciles the two once the server
- * responds — see the comment there.
+ * `record_catch` and is what actually gets saved. `landFish` reconciles the
+ * two once the server responds — see the comment there.
  */
 export function rollFish(weatherKind = "cerah"): FishCatch {
   const data = getFishData();
-  const monster = data.species.find((s) => s.is_monster);
-  const chance = data.config["monster_catch_chance"] ?? 0;
-  if (monster && Math.random() < chance) return toCatch(monster);
-
   const rod = equippedRod();
   const cap = rod.max_catch_weight_kg;
   const bait = equippedBait();
@@ -68,8 +73,8 @@ export function rollFish(weatherKind = "cerah"): FishCatch {
     (1 + Math.max(0, rod.luck_percent) / 100) * (1 + Math.max(0, bait.luck_percent) / 100);
   const weather = data.weather[weatherKind];
 
-  const pool = data.species.filter((s) => !s.is_monster && s.min_weight_kg <= cap);
-  if (pool.length === 0) return toCatch(data.species[0] ?? (monster as FishSpecies));
+  const pool = data.species.filter((s) => s.min_weight_kg <= cap);
+  if (pool.length === 0) return toCatch(data.species[0] as FishSpecies);
 
   const weights = pool.map((s) => {
     const r = s.rarity ?? "common";
@@ -83,18 +88,21 @@ export function rollFish(weatherKind = "cerah"): FishCatch {
   const total = weights.reduce((a, b) => a + b, 0);
 
   let pick = pool[pool.length - 1]!;
+  let pickWeight = weights[weights.length - 1]!;
   if (total > 0) {
     let roll = Math.random() * total;
     for (let i = 0; i < pool.length; i++) {
       roll -= weights[i]!;
       if (roll <= 0) {
         pick = pool[i]!;
+        pickWeight = weights[i]!;
         break;
       }
     }
   }
 
-  return toCatch(pick);
+  const oddsOneIn = pickWeight > 0 ? Math.max(1, Math.round(total / pickWeight)) : undefined;
+  return { ...toCatch(pick), oddsOneIn };
 }
 
 /**
@@ -148,11 +156,17 @@ interface GameStore {
   score: number;
   totalWeight: number;
   last: FishCatch | null;
+  /** The fish currently on the line, set the instant it bites and cleared
+   *  when it gets away or the cycle resets — drives CatchPopup, which needs
+   *  to show the reveal from the bite through the whole reel, not just once
+   *  `landFish` confirms the catch. */
+  current: FishCatch | null;
   /** true = rod stowed on back */
   rodStowed: boolean;
   bagOpen: boolean;
   setPhase: (p: Phase) => void;
   setMessage: (m: string) => void;
+  setCurrent: (f: FishCatch | null) => void;
   setRodStowed: (v: boolean) => void;
   toggleRodStowed: () => void;
   setBagOpen: (v: boolean) => void;
@@ -173,10 +187,12 @@ export const useGameStore = create<GameStore>((set) => ({
   score: 0,
   totalWeight: 0,
   last: null,
+  current: null,
   rodStowed: false,
   bagOpen: false,
   setPhase: (phase) => set({ phase }),
   setMessage: (message) => set({ message }),
+  setCurrent: (current) => set({ current }),
   setRodStowed: (rodStowed) => set({ rodStowed }),
   toggleRodStowed: () => set((s) => ({ rodStowed: !s.rodStowed })),
   setBagOpen: (bagOpen) => set({ bagOpen }),
