@@ -34,6 +34,9 @@ export interface NpcDef {
   sellsBoats?: boolean;
   /** teaser line for shops that are not implemented yet */
   comingSoon?: string;
+  /** the gold-reward NPC (new, gold economy feature) — renders RewardShop
+   * instead of the sell/trade flow in NpcDialog. */
+  isRewardNpc?: boolean;
 }
 
 export const NPCS: NpcDef[] = [
@@ -149,14 +152,12 @@ export const NPCS: NpcDef[] = [
     id: "beach_greeter",
     name: "Suri",
     role: "Beach Local",
-    place: "Beach Summer island, far shore",
-    // X/Z captured directly from the user's own in-game position via
-    // window.__player.pos (see src/hooks/usePlayer.ts dev aid) while
-    // standing on the "beach_summer__assets_kit.glb" island. Y is
-    // intentionally not hardcoded — Npcs.tsx snaps to the island's own
-    // "sand" ground mesh at runtime via groundAround(), same as every
-    // other NPC.
-    pos: [132.51, 941.52],
+    place: "Small tent, dock's far end",
+    // Real position, captured via window.__player.pos (see
+    // src/hooks/usePlayer.ts dev aid) as instructed by the user. Y is
+    // intentionally not hardcoded — Npcs.tsx snaps to the ground mesh at
+    // runtime via groundAround(), same as every other NPC.
+    pos: [-19.07, 47.77],
     talkDist: 5.5,
     face: "wink",
     trades: false,
@@ -175,6 +176,40 @@ export const NPCS: NpcDef[] = [
       "The tide out here brings in things the main dock never sees.",
       "I heard there's a shack further down the shore. Haven't checked it myself.",
       "Bring a boat next time — walking here from the dock takes forever.",
+    ],
+  },
+  {
+    id: "gold_broker",
+    name: "Reya",
+    role: "Gold Broker",
+    place: "Beach Summer island, far shore",
+    // Swapped with beach_greeter (Suri) on request — this is Suri's old,
+    // real captured position: X/Z read directly from the user's own
+    // in-game position via window.__player.pos (see src/hooks/usePlayer.ts
+    // dev aid) while standing on the "beach_summer__assets_kit.glb" island.
+    // Y is intentionally not hardcoded — Npcs.tsx snaps to the island's own
+    // "sand" ground mesh at runtime via groundAround(), same as every other
+    // NPC.
+    pos: [132.51, 941.52],
+    talkDist: 5.5,
+    face: "wink",
+    trades: false,
+    isRewardNpc: true,
+    outfit: {
+      skin: "#d9a86c",
+      shirt: "#8f5fbf",
+      pants: "#2c2540",
+      accent: "#f2d24a",
+      hat: "none",
+      hatColor: "#000000",
+      extra: "vest",
+    },
+    greeting:
+      "Bring me a haul of fish and I'll trade it for gold — real gold, the kind you can cash out. Come back daily, the offer resets.",
+    smallTalk: [
+      "Gold isn't coin. Coin buys gear here; gold you can walk away with.",
+      "The bigger your hold, the bigger the gold I can hand you each visit.",
+      "I only deal once a day, at midnight sharp. Don't be late.",
     ],
   },
 ];

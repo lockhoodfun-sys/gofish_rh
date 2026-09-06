@@ -11,6 +11,34 @@ const proofSchema = z.object({
 
 type WithdrawalRequest = Tables<"withdrawal_requests">;
 
+export interface HoldTierView {
+  id: string;
+  min_usd_value: number;
+  generation_cap_gold: number | null;
+  wd_min: number | null;
+  wd_max: number | null;
+  wd_per_day: number;
+}
+
+export interface HoldStatusView {
+  usdValue: number;
+  tier: HoldTierView | null;
+}
+
+/** Live on-chain hold value + resolved tier, so the Gold panel can show
+ * withdraw min/max/frequency and validate an amount BEFORE the player
+ * submits — request_withdrawal (SQL) re-checks all of this again anyway,
+ * this is purely for UX. */
+export const getHoldStatus = createServerFn({ method: "POST" })
+  .validator((input: unknown) => proofSchema.parse(input))
+  .handler(async ({ data }): Promise<HoldStatusView> => {
+    const { verifyWalletProof } = await import("./walletProof.server");
+    const { resolveHoldStatus } = await import("./onchain.server");
+    const wallet = await verifyWalletProof(data);
+    const hold = await resolveHoldStatus(wallet);
+    return { usdValue: hold.usdValue, tier: hold.tier };
+  });
+
 const requestSchema = z.object({ proof: proofSchema, amount: z.number().positive() });
 
 /** Requests a gold withdrawal. Tier (min/max/frequency) is resolved live

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Fish, Loader2, Upload } from "lucide-react";
+import { Fish, ListChecks, Loader2, Upload } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfileStore } from "@/hooks/useProfileStore";
+import { useQuestStore } from "@/hooks/useQuestStore";
 import { updateProfile, uploadAvatar, grantTestCoins } from "@/lib/profile.functions";
 import { xpProgressFor } from "@/lib/xp";
 
@@ -43,6 +44,7 @@ function fileToBase64(file: File) {
 
 export function ProfilePanel() {
   const { panelOpen, setPanelOpen, profile, setProfile, proof } = useProfileStore();
+  const setQuestPanelOpen = useQuestStore((s) => s.setPanelOpen);
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
@@ -237,6 +239,18 @@ export function ProfilePanel() {
             ))}
           </div>
         </div>
+
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            setPanelOpen(false);
+            setQuestPanelOpen(true);
+          }}
+        >
+          <ListChecks className="mr-2 h-4 w-4" aria-hidden />
+          Quests
+        </Button>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

@@ -133,6 +133,36 @@ export type Database = {
         }
         Relationships: []
       }
+      fish_hold_tiers: {
+        Row: {
+          generation_cap_gold: number | null
+          id: string
+          min_usd_value: number
+          sort_order: number
+          wd_max: number | null
+          wd_min: number | null
+          wd_per_day: number
+        }
+        Insert: {
+          generation_cap_gold?: number | null
+          id: string
+          min_usd_value: number
+          sort_order?: number
+          wd_max?: number | null
+          wd_min?: number | null
+          wd_per_day?: number
+        }
+        Update: {
+          generation_cap_gold?: number | null
+          id?: string
+          min_usd_value?: number
+          sort_order?: number
+          wd_max?: number | null
+          wd_min?: number | null
+          wd_per_day?: number
+        }
+        Relationships: []
+      }
       game_config: {
         Row: {
           key: string
@@ -147,6 +177,44 @@ export type Database = {
           value?: number
         }
         Relationships: []
+      }
+      gold_ledger: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          id: string
+          metadata: Json
+          reason: string
+          wallet_address: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          id?: string
+          metadata?: Json
+          reason: string
+          wallet_address: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          id?: string
+          metadata?: Json
+          reason?: string
+          wallet_address?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gold_ledger_wallet_address_fkey"
+            columns: ["wallet_address"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["wallet_address"]
+          },
+        ]
       }
       mutations: {
         Row: {
@@ -166,6 +234,96 @@ export type Database = {
           key?: string
           label?: string
           multiplier?: number
+        }
+        Relationships: []
+      }
+      npc_reward_claims: {
+        Row: {
+          base_claims_count: number
+          bonus_claimed: boolean
+          event_id: string
+          id: string
+          total_gold_earned: number
+          updated_at: string
+          wallet_address: string
+        }
+        Insert: {
+          base_claims_count?: number
+          bonus_claimed?: boolean
+          event_id: string
+          id?: string
+          total_gold_earned?: number
+          updated_at?: string
+          wallet_address: string
+        }
+        Update: {
+          base_claims_count?: number
+          bonus_claimed?: boolean
+          event_id?: string
+          id?: string
+          total_gold_earned?: number
+          updated_at?: string
+          wallet_address?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_reward_claims_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "npc_reward_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npc_reward_claims_wallet_address_fkey"
+            columns: ["wallet_address"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["wallet_address"]
+          },
+        ]
+      }
+      npc_reward_config: {
+        Row: {
+          key: string
+          value: number
+        }
+        Insert: {
+          key: string
+          value: number
+        }
+        Update: {
+          key?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      npc_reward_events: {
+        Row: {
+          base_requirement: Json
+          bonus_requirement: Json
+          created_at: string
+          event_date: string
+          expire_at: string
+          id: string
+          spawn_at: string
+        }
+        Insert: {
+          base_requirement: Json
+          bonus_requirement: Json
+          created_at?: string
+          event_date: string
+          expire_at: string
+          id?: string
+          spawn_at: string
+        }
+        Update: {
+          base_requirement?: Json
+          bonus_requirement?: Json
+          created_at?: string
+          event_date?: string
+          expire_at?: string
+          id?: string
+          spawn_at?: string
         }
         Relationships: []
       }
@@ -241,6 +399,38 @@ export type Database = {
           },
         ]
       }
+      player_quest_progress: {
+        Row: {
+          current_quest_order: number
+          progress_value: number
+          status: string
+          updated_at: string
+          wallet_address: string
+        }
+        Insert: {
+          current_quest_order?: number
+          progress_value?: number
+          status?: string
+          updated_at?: string
+          wallet_address: string
+        }
+        Update: {
+          current_quest_order?: number
+          progress_value?: number
+          status?: string
+          updated_at?: string
+          wallet_address?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_quest_progress_wallet_address_fkey"
+            columns: ["wallet_address"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["wallet_address"]
+          },
+        ]
+      }
       player_rods: {
         Row: {
           equipped: boolean
@@ -288,6 +478,7 @@ export type Database = {
           fish_legendary: number
           fish_mythic: number
           fish_rare: number
+          gold: number
           level: number
           updated_at: string
           username: string
@@ -304,6 +495,7 @@ export type Database = {
           fish_legendary?: number
           fish_mythic?: number
           fish_rare?: number
+          gold?: number
           level?: number
           updated_at?: string
           username: string
@@ -320,11 +512,39 @@ export type Database = {
           fish_legendary?: number
           fish_mythic?: number
           fish_rare?: number
+          gold?: number
           level?: number
           updated_at?: string
           username?: string
           wallet_address?: string
           xp?: number
+        }
+        Relationships: []
+      }
+      quest_definitions: {
+        Row: {
+          description: string
+          id: string
+          order_index: number
+          requirement: Json
+          reward_coins: number
+          title: string
+        }
+        Insert: {
+          description: string
+          id: string
+          order_index: number
+          requirement: Json
+          reward_coins: number
+          title: string
+        }
+        Update: {
+          description?: string
+          id?: string
+          order_index?: number
+          requirement?: Json
+          reward_coins?: number
+          title?: string
         }
         Relationships: []
       }
@@ -408,6 +628,50 @@ export type Database = {
           weather_kind?: string
         }
         Relationships: []
+      }
+      withdrawal_requests: {
+        Row: {
+          gold_amount: number
+          id: string
+          notes: string | null
+          processed_at: string | null
+          processed_by: string | null
+          requested_at: string
+          status: string
+          tx_hash: string | null
+          wallet_address: string
+        }
+        Insert: {
+          gold_amount: number
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          requested_at?: string
+          status?: string
+          tx_hash?: string | null
+          wallet_address: string
+        }
+        Update: {
+          gold_amount?: number
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          requested_at?: string
+          status?: string
+          tx_hash?: string | null
+          wallet_address?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_requests_wallet_address_fkey"
+            columns: ["wallet_address"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["wallet_address"]
+          },
+        ]
       }
     }
     Views: {

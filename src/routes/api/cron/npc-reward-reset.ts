@@ -7,7 +7,7 @@
 // event on-demand if this cron is ever late/missed, so a player is never
 // blocked — this endpoint just makes the "fresh at 00:00 UTC" behavior
 // deterministic instead of relying on the first visitor of the day.
-import { createServerFileRoute } from "@tanstack/react-start/server";
+import { createFileRoute } from "@tanstack/react-router";
 import { authenticateCronRequest } from "@/integrations/supabase/cron-auth";
 
 async function generateTodayEvent() {
@@ -60,20 +60,24 @@ async function generateTodayEvent() {
   return { created: true, eventDate: dateKey, baseRequirement, bonusRequirement };
 }
 
-export const Route = createServerFileRoute("/api/cron/npc-reward-reset").methods({
-  POST: async ({ request }) => {
-    const authFailure = await authenticateCronRequest(request);
-    if (authFailure) return authFailure;
+export const Route = createFileRoute("/api/cron/npc-reward-reset")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const authFailure = await authenticateCronRequest(request);
+        if (authFailure) return authFailure;
 
-    try {
-      const result = await generateTodayEvent();
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    } catch (error) {
-      console.error("[cron/npc-reward-reset]", error);
-      return new Response("Internal error", { status: 500 });
-    }
+        try {
+          const result = await generateTodayEvent();
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        } catch (error) {
+          console.error("[cron/npc-reward-reset]", error);
+          return new Response("Internal error", { status: 500 });
+        }
+      },
+    },
   },
 });

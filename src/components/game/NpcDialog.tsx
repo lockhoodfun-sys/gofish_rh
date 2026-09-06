@@ -9,6 +9,7 @@ import { useInventoryStore } from "@/hooks/useInventoryStore";
 import { RodShop } from "./RodShop";
 import { BaitShop } from "./BaitShop";
 import { BoatShop } from "./BoatShop";
+import { RewardShop } from "./RewardShop";
 
 function speciesName(id: string) {
   return getFishData().species.find((s) => s.id === id)?.name ?? id;
@@ -22,7 +23,9 @@ export function NpcDialog() {
   const profile = useProfileStore((s) => s.profile);
   const setProfile = useProfileStore((s) => s.setProfile);
 
-  const [stage, setStage] = useState<"greeting" | "sell" | "talk" | "rods" | "baits" | "boats">("greeting");
+  const [stage, setStage] = useState<
+    "greeting" | "sell" | "talk" | "rods" | "baits" | "boats" | "reward"
+  >("greeting");
   const items = useInventoryStore((s) => s.items);
   const loading = useInventoryStore((s) => s.loading);
   const refreshInventory = useInventoryStore((s) => s.refresh);
@@ -34,12 +37,13 @@ export function NpcDialog() {
   const sellsRods = !!npc?.sellsRods;
   const sellsBaits = !!npc?.sellsBaits;
   const sellsBoats = !!npc?.sellsBoats;
+  const isRewardNpc = !!npc?.isRewardNpc;
 
   const refresh = useCallback(async () => {
-    if (!proof || !trades) return;
+    if (!proof || (!trades && !isRewardNpc)) return;
     setError(null);
     await refreshInventory();
-  }, [proof, trades, refreshInventory]);
+  }, [proof, trades, isRewardNpc, refreshInventory]);
 
   useEffect(() => {
     if (!openId) return;
@@ -128,6 +132,8 @@ export function NpcDialog() {
             <BoatShop />
           ) : stage === "baits" ? (
             <BaitShop />
+          ) : stage === "reward" ? (
+            <RewardShop />
           ) : stage === "talk" ? (
             <p className="text-sm leading-relaxed text-slate-200">"{talk}"</p>
           ) : stage === "greeting" || !trades ? (
@@ -231,6 +237,16 @@ export function NpcDialog() {
               className="rounded-lg bg-amber-400/90 px-3 py-1.5 text-xs font-semibold text-slate-900 transition-colors hover:bg-amber-300"
             >
               Browse boats
+            </button>
+          )}
+          {isRewardNpc && stage !== "reward" && (
+            <button
+              type="button"
+              disabled={!proof}
+              onClick={() => setStage("reward")}
+              className="rounded-lg bg-amber-400/90 px-3 py-1.5 text-xs font-semibold text-slate-900 transition-colors hover:bg-amber-300 disabled:opacity-50"
+            >
+              Trade for gold
             </button>
           )}
           {trades && stage !== "sell" && (

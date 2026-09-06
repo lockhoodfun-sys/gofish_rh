@@ -44,7 +44,15 @@ export const getQuestProgress = createServerFn({ method: "POST" })
     >("get_quest_progress", { _wallet: wallet });
     if (res.error) throw new Error(res.error.message);
     const row = Array.isArray(res.data) ? res.data[0] : res.data;
-    if (!row) return null; // all 10 quests already claimed
+    // NOTE: `row` is null only if player_quest_progress/quest_definitions data
+    // is missing or inconsistent — it is NOT how "all 10 quests claimed" shows
+    // up. After the last quest (order_index 10) is claimed,
+    // current_quest_order stays pinned at 10 forever (see
+    // claim_quest_reward's coalesce(v_next_order, ...)), so this RPC keeps
+    // returning quest_10's row with status "claimed". Callers must check
+    // `status === "claimed"` to detect "no more quests to do", not truthiness
+    // of the return value.
+    if (!row) return null;
 
     return {
       questId: row.quest_id,

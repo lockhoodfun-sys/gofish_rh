@@ -27,6 +27,8 @@ import { player } from "@/hooks/usePlayer";
 import { resumeWeatherAudio } from "@/lib/weatherAudio";
 import { WalletButton } from "../wallet/WalletButton";
 import { ProfilePanel } from "../profile/ProfilePanel";
+import { GoldPanel } from "../gold/GoldPanel";
+import { QuestPanel } from "../quest/QuestPanel";
 import { Npcs } from "./Npcs";
 import { NpcDialog } from "./NpcDialog";
 
@@ -168,6 +170,8 @@ export function GameCanvas() {
         <WalletButton />
       </div>
       <ProfilePanel />
+      <GoldPanel />
+      <QuestPanel />
       <NpcDialog />
     </div>
   );

@@ -5,6 +5,7 @@ import { formatUnits } from "viem";
 import { robinhoodChain } from "@/lib/chains";
 import { useProfileStore } from "@/hooks/useProfileStore";
 import { useWalletProfile } from "@/hooks/useWalletProfile";
+import { useGoldStore } from "@/hooks/useGoldStore";
 import { supabase } from "@/integrations/supabase/client";
 import goldLogo from "@/assets/logo-gold.png";
 import coinsLogo from "@/assets/logo-coins.png";
@@ -57,15 +58,32 @@ function ProfileAvatar({ size = "h-9 w-9" }: { size?: string }) {
   );
 }
 
-function BalanceRow({ symbol, value, logo }: { symbol: string; value: string; logo: string }) {
+function BalanceRow({
+  symbol,
+  value,
+  logo,
+  onClick,
+}: {
+  symbol: string;
+  value: string;
+  logo: string;
+  onClick?: () => void;
+}) {
+  const Comp = onClick ? "button" : "div";
   return (
-    <div className="flex items-center justify-between px-2.5 py-1 text-[11px] leading-tight">
+    <Comp
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`flex w-full items-center justify-between px-2.5 py-1 text-[11px] leading-tight ${
+        onClick ? "transition-colors hover:bg-white/5" : ""
+      }`}
+    >
       <span className="flex items-center gap-1.5 font-medium text-slate-300">
         <img src={logo} alt={`${symbol} logo`} className="h-5 w-5 rounded-full object-cover" />
         {symbol}
       </span>
       <span className="font-semibold tabular-nums text-slate-50">{value}</span>
-    </div>
+    </Comp>
   );
 }
 
@@ -83,6 +101,7 @@ export function WalletButton() {
   const profile = useProfileStore((s) => s.profile);
   const loading = useProfileStore((s) => s.loading);
   const setPanelOpen = useProfileStore((s) => s.setPanelOpen);
+  const setGoldPanelOpen = useGoldStore((s) => s.setPanelOpen);
   const xp = xpProgressFor(profile?.xp);
 
   const { data: ethBalance } = useBalance({
@@ -157,7 +176,12 @@ export function WalletButton() {
       <div className="divide-y divide-white/5">
         <BalanceRow symbol="ETH" value={ethValue} logo="/logo-eth.png" />
         <BalanceRow symbol="USDG" value={displayBalance("0.00")} logo="/logo-usdg.png" />
-        <BalanceRow symbol="GOLD" value={displayBalance(0)} logo={goldLogo} />
+        <BalanceRow
+          symbol="GOLD"
+          value={displayBalance(Number(profile?.gold ?? 0).toLocaleString())}
+          logo={goldLogo}
+          onClick={() => setGoldPanelOpen(true)}
+        />
         <BalanceRow symbol="COINS" value={displayBalance(Number(profile?.coins ?? 0).toLocaleString())} logo={coinsLogo} />
       </div>
     </div>
