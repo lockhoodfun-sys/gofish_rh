@@ -20,6 +20,7 @@ export interface PlayerRod {
   luck_percent: number;
   speed_percent: number;
   price_coins: number;
+  min_level: number;
   equipped: boolean;
   owned: boolean;
 }
@@ -33,6 +34,7 @@ function normalize(rows: unknown): PlayerRod[] {
     luck_percent: Number(r["luck_percent"] ?? 0),
     speed_percent: Number(r["speed_percent"] ?? 0),
     price_coins: Number(r["price_coins"] ?? 0),
+    min_level: Number(r["min_level"] ?? 1),
     equipped: Boolean(r["equipped"]),
     owned: r["purchased_at"] != null,
   }));

@@ -80,6 +80,7 @@ export function BaitOrb({ baitId }: { baitId: string }) {
 export function BaitShop() {
   const proof = useProfileStore((s) => s.proof);
   const coins = Math.round(Number(useProfileStore((s) => s.profile?.coins) ?? 0));
+  const level = Math.round(Number(useProfileStore((s) => s.profile?.level) ?? 1));
   const baits = useBaitStore((s) => s.baits);
   const loading = useBaitStore((s) => s.loading);
   const busyId = useBaitStore((s) => s.busyId);
@@ -121,6 +122,7 @@ export function BaitShop() {
       <div className="flex gap-3 overflow-x-auto pb-2">
         {baits.map((bait) => {
           const busy = busyId === bait.bait_id;
+          const locked = !bait.owned && level < bait.min_level;
           const affordable = coins >= bait.price_coins;
           const look = baitLook(bait.bait_id);
           return (
@@ -131,13 +133,19 @@ export function BaitShop() {
                   ? "border-amber-300/80 bg-amber-300/10"
                   : bait.owned
                     ? "border-white/25 bg-white/[0.05]"
-                    : "border-white/15 bg-white/[0.03]"
+                    : locked
+                      ? "border-white/10 bg-white/[0.02] opacity-60"
+                      : "border-white/15 bg-white/[0.03]"
               }`}
             >
               <p className="text-center text-sm font-bold text-slate-100">{bait.name}</p>
               {bait.owned ? (
                 <p className="text-center text-[11px] font-extrabold uppercase tracking-wide text-emerald-400">
                   {bait.equipped ? "In use" : "Owned"}
+                </p>
+              ) : locked ? (
+                <p className="text-center text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+                  Requires level {bait.min_level}
                 </p>
               ) : (
                 <p className="flex items-center justify-center gap-1 text-[12px] font-bold text-amber-300">
@@ -173,11 +181,17 @@ export function BaitShop() {
               ) : (
                 <button
                   type="button"
-                  disabled={busy || !affordable}
+                  disabled={busy || !affordable || locked}
                   onClick={() => void buy(bait.bait_id)}
                   className="mt-2 w-full rounded-lg bg-emerald-500 py-1.5 text-xs font-extrabold text-slate-950 transition-colors hover:bg-emerald-400 disabled:opacity-40"
                 >
-                  {busy ? "Buying…" : affordable ? "Buy" : "Not enough coins"}
+                  {busy
+                    ? "Buying…"
+                    : locked
+                      ? `Locked · Lv ${bait.min_level}`
+                      : affordable
+                        ? "Buy"
+                        : "Not enough coins"}
                 </button>
               )}
             </div>

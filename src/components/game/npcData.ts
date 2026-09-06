@@ -145,6 +145,38 @@ export const NPCS: NpcDef[] = [
       "A fast hull outruns a storm. A cheap one becomes a reef.",
     ],
   },
+  {
+    id: "beach_greeter",
+    name: "Suri",
+    role: "Beach Local",
+    place: "Beach Summer island, far shore",
+    // X/Z captured directly from the user's own in-game position via
+    // window.__player.pos (see src/hooks/usePlayer.ts dev aid) while
+    // standing on the "beach_summer__assets_kit.glb" island. Y is
+    // intentionally not hardcoded — Npcs.tsx snaps to the island's own
+    // "sand" ground mesh at runtime via groundAround(), same as every
+    // other NPC.
+    pos: [132.51, 941.52],
+    talkDist: 5.5,
+    face: "wink",
+    trades: false,
+    outfit: {
+      skin: "#e0a878",
+      shirt: "#f2d24a",
+      pants: "#3f7f6b",
+      accent: "#fef3c7",
+      hat: "straw",
+      hatColor: "#d97706",
+      extra: "vest",
+    },
+    greeting:
+      "Hey! Not many anglers make it all the way out to this beach. Sun's better here anyway.",
+    smallTalk: [
+      "The tide out here brings in things the main dock never sees.",
+      "I heard there's a shack further down the shore. Haven't checked it myself.",
+      "Bring a boat next time — walking here from the dock takes forever.",
+    ],
+  },
 ];
 
 export function npcById(id: string | null) {

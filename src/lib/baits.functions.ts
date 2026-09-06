@@ -18,6 +18,7 @@ export interface PlayerBait {
   name: string;
   luck_percent: number;
   price_coins: number;
+  min_level: number;
   equipped: boolean;
   owned: boolean;
 }
@@ -29,6 +30,7 @@ function normalize(rows: unknown): PlayerBait[] {
     name: String(b["name"]),
     luck_percent: Number(b["luck_percent"] ?? 0),
     price_coins: Number(b["price_coins"] ?? 0),
+    min_level: Number(b["min_level"] ?? 1),
     equipped: Boolean(b["equipped"]),
     owned: b["purchased_at"] != null,
   }));
