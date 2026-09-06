@@ -209,6 +209,15 @@ export const recordCatch = createServerFn({ method: "POST" })
       out_profile: Tables<"profiles">;
     };
 
+    // Quests are unrelated to level/XP gating (per approved plan §0.11) — this
+    // only advances the current quest slot's progress counter, best-effort.
+    // A failure here must never fail the catch itself.
+    try {
+      await supabaseAdmin.rpc("advance_quest_progress", { _wallet: wallet, _rarity: row.out_rarity });
+    } catch (err) {
+      console.error("[recordCatch] advance_quest_progress failed", err);
+    }
+
     return {
       speciesId: row.out_species_id,
       speciesName: row.out_species_name,

@@ -1,0 +1,53 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { rpc } from "./rpc";
+import type { Tables } from "@/integrations/supabase/types";
+
+const proofSchema = z.object({
+  address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  issuedAt: z.string(),
+  signature: z.string().regex(/^0x[a-fA-F0-9]+$/),
+});
+
+type WithdrawalRequest = Tables<"withdrawal_requests">;
+
+const requestSchema = z.object({ proof: proofSchema, amount: z.number().positive() });
+
+/** Requests a gold withdrawal. Tier (min/max/frequency) is resolved live
+ * on-chain server-side — never trust a client-supplied tier. */
+export const requestWithdrawal = createServerFn({ method: "POST" })
+  .validator((input: unknown) => requestSchema.parse(input))
+  .handler(async ({ data }): Promise<WithdrawalRequest> => {
+    const { verifyWalletProof } = await import("./walletProof.server");
+    const { resolveHoldStatus } = await import("./onchain.server");
+
+    const wallet = await verifyWalletProof(data.proof);
+    const hold = await resolveHoldStatus(wallet);
+    if (!hold.tier) throw new Error("Not eligible to withdraw.");
+
+    const res = await rpc<WithdrawalRequest>("request_withdrawal", {
+      _wallet: wallet,
+      _amount: data.amount,
+      _tier_id: hold.tier.id,
+    });
+    if (res.error) throw new Error(res.error.message);
+    return res.data as WithdrawalRequest;
+  });
+
+/** The caller's own withdrawal history, most recent first. */
+export const getMyWithdrawals = createServerFn({ method: "POST" })
+  .validator((input: unknown) => proofSchema.parse(input))
+  .handler(async ({ data }): Promise<WithdrawalRequest[]> => {
+    const { verifyWalletProof } = await import("./walletProof.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const wallet = await verifyWalletProof(data);
+
+    const res = await supabaseAdmin
+      .from("withdrawal_requests")
+      .select("*")
+      .eq("wallet_address", wallet)
+      .order("requested_at", { ascending: false })
+      .limit(50);
+    if (res.error) throw new Error(res.error.message);
+    return res.data as WithdrawalRequest[];
+  });
