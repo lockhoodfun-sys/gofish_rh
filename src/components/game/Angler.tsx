@@ -76,6 +76,11 @@ export function Angler() {
   const splash = useRef<THREE.Group>(null);
   const burst = useRef<THREE.Group>(null);
   const reelCrank = useRef<THREE.Group>(null);
+  /** brief warm glow at the rod tip/hands the instant a catch lands — see
+   *  the "PULL" step of the catch-impact sequence (CatchPopup handles the
+   *  screen-space flash/rays/text; this is the one bit of that sequence
+   *  that has to live in-world since it's anchored to the rod). */
+  const rodGlow = useRef<THREE.PointLight>(null);
   /** anchor di tangan kanan (joran dipegang) */
   const handAnchor = useRef<THREE.Group>(null);
   /** anchor di punggung (joran dilepas / disampirkan) */
@@ -289,6 +294,8 @@ export function Angler() {
 
     // efek burst hanya aktif selama fase caught monster; reset tiap frame
     if (burst.current) burst.current.visible = false;
+    // glow joran hanya aktif ~0.25s di awal fase caught (ikan biasa); reset tiap frame
+    if (rodGlow.current) rodGlow.current.intensity = 0;
 
     // ---- WASD movement (camera-relative), only while not fishing --------
     const k = keys.current;
@@ -731,6 +738,15 @@ export function Angler() {
       } else {
         // ---------- normal fish caught (unchanged) ----------
         const k = Math.min(st.t / 1.9, 1);
+        // brief warm glow at the rod tip right as the catch lands — rises
+        // and fades within the first ~0.25s, matching the "PULL" step of
+        // the catch-impact sequence (screen-space burst/text lives in
+        // CatchPopup, which starts its own sequence off the same phase
+        // change so the two stay roughly in sync).
+        if (rodGlow.current) {
+          const glowT = Math.min(st.t / 0.25, 1);
+          rodGlow.current.intensity = Math.sin(glowT * Math.PI) * 2.2;
+        }
         // triumphant lift: rod raised, fish swings up in an arc
         armR = lerp(-1.1, -1.7, Math.min(k * 3, 1));
         armRZ = lerp(0.38, 0.18, Math.min(k * 2, 1));
@@ -1266,6 +1282,14 @@ export function Angler() {
                   </group>
 
                   <object3D ref={rodTip} position={[0, 2.2, 0]} />
+                  <pointLight
+                    ref={rodGlow}
+                    position={[0, 2.2, 0]}
+                    color="#fff3c4"
+                    intensity={0}
+                    distance={5}
+                    decay={2}
+                  />
                 </group>
               </group>
             </group>

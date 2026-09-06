@@ -637,3 +637,49 @@ export function playBobberSplash(strength = 1) {
   }
 }
 
+/**
+ * Short "sparkle" chime for a successful catch reveal — a quick ascending
+ * arpeggio of soft sine tones plus a light noise shimmer, scaled a bit
+ * brighter for rarer catches. Purely synthesized (no asset), matching the
+ * rest of this file's procedural approach. Safe no-op hook if the audio
+ * context isn't ready yet — call sites don't need to guard.
+ */
+export function playCatchSuccessSound(rarityBoost = 1) {
+  resumeWeatherAudio();
+  if (!ctx || !master || muted) return;
+  const t = ctx.currentTime;
+  const notes = [880, 1175, 1568]; // A5, D6, G6 — bright, quick, non-fatiguing
+  notes.forEach((freq, i) => {
+    const start = t + i * 0.045;
+    const o = ctx!.createOscillator();
+    o.type = "sine";
+    const g = ctx!.createGain();
+    const peak = 0.05 * rarityBoost;
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(peak, start + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+    o.frequency.setValueAtTime(freq, start);
+    o.frequency.exponentialRampToValueAtTime(freq * 1.03, start + 0.2);
+    o.connect(g);
+    g.connect(master!);
+    o.start(start);
+    o.stop(start + 0.24);
+  });
+
+  if (noiseBuffer) {
+    const shimmer = ctx.createBufferSource();
+    shimmer.buffer = noiseBuffer;
+    shimmer.playbackRate.value = 2.2;
+    const f = ctx.createBiquadFilter();
+    f.type = "highpass";
+    f.frequency.value = 4000;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.025 * rarityBoost, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    shimmer.connect(f);
+    f.connect(g);
+    g.connect(master);
+    shimmer.start(t, Math.random() * 1.2, 0.2);
+  }
+}
