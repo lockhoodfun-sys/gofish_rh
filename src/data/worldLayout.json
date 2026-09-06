@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": 1788502579941,
+  "updatedAt": 1788689843676,
   "objects": [
     {
       "id": "o_mtmfyept_2q85z",
@@ -889,6 +889,134 @@
       "solid": false,
       "visible": true,
       "url": "/models/free_low_poly_generic_treasure_chest-cd4b2d4f.glb"
+    },
+    {
+      "id": "o_mtpmdnav_623hn",
+      "name": "beach_summer__assets_kit.glb",
+      "ext": "glb",
+      "position": [
+        137.1012857864261,
+        2.033460417960929,
+        959.5750671217668
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        20,
+        21.259199211364198,
+        20
+      ],
+      "walkable": true,
+      "solid": false,
+      "visible": true,
+      "url": "/models/beach_summer__assets_kit-834d2a6d.glb",
+      "groundMaterials": [
+        "sand"
+      ]
+    },
+    {
+      "id": "o_mtpmy51r_pb6dd",
+      "name": "mountain.glb",
+      "ext": "glb",
+      "position": [
+        503.43159844921354,
+        -23.313627791559195,
+        633.8750443427634
+      ],
+      "rotation": [
+        0,
+        -0.15,
+        0
+      ],
+      "scale": [
+        10,
+        10,
+        10
+      ],
+      "walkable": true,
+      "solid": false,
+      "visible": true,
+      "url": "/models/mountain-99dd9cce.glb"
+    },
+    {
+      "id": "o_mtpn3hfs_wdn6n",
+      "name": "mountain.glb (copy)",
+      "ext": "glb",
+      "position": [
+        507.43159844921354,
+        -10.871018655926374,
+        694.1423320903608
+      ],
+      "rotation": [
+        0,
+        -0.15,
+        0
+      ],
+      "scale": [
+        10,
+        10,
+        10
+      ],
+      "walkable": true,
+      "solid": false,
+      "visible": true,
+      "url": "/models/mountain-99dd9cce.glb"
+    },
+    {
+      "id": "o_mtpnb7k7_12hvl",
+      "name": "shark+3d+model.glb",
+      "ext": "glb",
+      "position": [
+        0,
+        -20.68265105013145,
+        577.2982092330092
+      ],
+      "rotation": [
+        0,
+        0.5,
+        -0.3
+      ],
+      "scale": [
+        50,
+        50,
+        50
+      ],
+      "walkable": true,
+      "solid": false,
+      "visible": true,
+      "url": "/models/shark_3d_model-2389d6f4.glb"
+    },
+    {
+      "id": "o_mtpnhqvb_xzkb5",
+      "name": "fishermans_shack__detailed_draft.glb",
+      "ext": "glb",
+      "position": [
+        127.19464175613368,
+        -9.193459391069768,
+        1023.8870838695707
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        10,
+        10.662380540661854,
+        10
+      ],
+      "walkable": true,
+      "solid": false,
+      "visible": true,
+      "url": "/models/fishermans_shack__detailed_draft-86f7cda4.glb",
+      "groundMaterials": [
+        "wood",
+        "dark_wood",
+        "roof_tiles"
+      ]
     }
   ]
 }

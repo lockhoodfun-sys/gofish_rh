@@ -130,9 +130,10 @@ function LoadedModel({ obj, url }: { obj: WorldObject; url: string }) {
   useEffect(() => {
     const g = group.current;
     if (!g) return;
-    registerCollider(obj.id, g, obj.walkable, obj.solid);
+    registerCollider(obj.id, g, obj.walkable, obj.solid, obj.groundMaterials);
     return () => unregisterCollider(obj.id);
-  }, [obj.id, obj.walkable, obj.solid, node]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [obj.id, obj.walkable, obj.solid, obj.groundMaterials?.join(","), node]);
 
   // Refresh only this object's cached bounds, and only when its own transform
   // actually changed (comparing values, not array identity) or the whole layout

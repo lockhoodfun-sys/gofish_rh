@@ -18,6 +18,14 @@ export interface WorldObject {
   scale: Vec3;
   /** player can stand on it (ground raycast) */
   walkable: boolean;
+  /**
+   * Optional allowlist of material names that count as ground when
+   * `walkable` is true. Undefined/empty = every mesh counts (old behaviour).
+   * Use this on compound models (floor + decorative props baked into one
+   * GLB) so props like an umbrella or a chair aren't treated as standable
+   * ground just because the whole object is walkable.
+   */
+  groundMaterials?: string[] | undefined;
   /** blocks the player (bounding box) */
   solid: boolean;
   visible: boolean;

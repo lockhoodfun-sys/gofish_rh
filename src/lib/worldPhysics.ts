@@ -32,6 +32,14 @@ export interface Collider {
   /** flattened list of meshes, so we skip a traverse on every query */
   meshes: THREE.Mesh[];
   /**
+   * Subset of `meshes` actually used by groundAt(). Equal to `meshes` unless
+   * the object sets `groundMaterials`, in which case only meshes whose
+   * material name is in that list count as ground — lets a single compound
+   * GLB (floor + decorative props baked together) expose just the floor to
+   * the ground raycast instead of letting the player "climb" onto props.
+   */
+  groundMeshes: THREE.Mesh[];
+  /**
    * Per-mesh world boxes used for solid collision. A single root box turns a
    * shop (roof + eaves included) into an impassable slab, so we block against
    * the individual parts and let the player walk into open fronts.
@@ -199,14 +207,38 @@ function collectMeshes(obj: THREE.Object3D, walkable: boolean): THREE.Mesh[] {
   return meshes;
 }
 
+/** Material name(s) applied to a mesh (handles multi-material meshes too). */
+function meshMaterialNames(m: THREE.Mesh): string[] {
+  const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+  if (!mat) return [];
+  const list = Array.isArray(mat) ? mat : [mat];
+  return list.map((x) => x?.name).filter((n): n is string => !!n);
+}
+
+function filterByMaterials(meshes: THREE.Mesh[], groundMaterials?: string[]): THREE.Mesh[] {
+  if (!groundMaterials || groundMaterials.length === 0) return meshes;
+  const allow = new Set(groundMaterials);
+  return meshes.filter((m) => meshMaterialNames(m).some((n) => allow.has(n)));
+}
+
+/** id -> unique material names found on that object's meshes, for the editor UI. */
+const materialsByObject = new Map<string, string[]>();
+
+export function getObjectMaterials(id: string): string[] {
+  return materialsByObject.get(id) ?? [];
+}
+
 export function registerCollider(
   id: string,
   obj: THREE.Object3D,
   walkable: boolean,
   solid: boolean,
+  groundMaterials?: string[],
 ) {
   obj.updateWorldMatrix(true, true);
   const meshes = collectMeshes(obj, walkable);
+  materialsByObject.set(id, [...new Set(meshes.flatMap(meshMaterialNames))]);
+  const groundMeshes = walkable ? filterByMaterials(meshes, groundMaterials) : [];
   const rootBox = new THREE.Box3().setFromObject(obj);
   const built = solid
     ? buildParts(obj, meshes, rootBox)
@@ -218,6 +250,7 @@ export function registerCollider(
     solid,
     box: rootBox,
     meshes,
+    groundMeshes,
     parts: built.parts,
     grid: built.grid,
   });
@@ -226,6 +259,7 @@ export function registerCollider(
 
 export function unregisterCollider(id: string) {
   colliders.delete(id);
+  materialsByObject.delete(id);
   invalidate();
 }
 
@@ -281,7 +315,7 @@ export function groundAt(x: number, z: number, from = 500): number | null {
     // cheap reject with the cached bounds
     if (x < c.box.min.x - 0.1 || x > c.box.max.x + 0.1) continue;
     if (z < c.box.min.z - 0.1 || z > c.box.max.z + 0.1) continue;
-    for (const m of c.meshes) {
+    for (const m of c.groundMeshes) {
       const hits = raycaster.intersectObject(m, false);
       for (const h of hits) {
         if (best === null || h.point.y > best) best = h.point.y;
@@ -400,4 +434,3 @@ if (typeof window !== "undefined") {
     return out;
   };
 }
-

@@ -8,6 +8,32 @@ import {
 } from "@/lib/assetLibrary";
 import { useWorldStore, type EditorMode, type Vec3, type WorldLayout } from "@/hooks/useWorldStore";
 import { canBakeToProject, uploadModelToProject } from "@/lib/projectAssets";
+import { getObjectMaterials } from "@/lib/worldPhysics";
+
+/**
+ * Material names load asynchronously (the GLB has to fetch + parse first),
+ * so poll briefly instead of reading the physics cache once. Stops as soon
+ * as it finds something and stays quiet once it does.
+ */
+function useObjectMaterials(id: string | undefined): string[] {
+  const [names, setNames] = useState<string[]>([]);
+  useEffect(() => {
+    if (!id) {
+      setNames([]);
+      return;
+    }
+    setNames(getObjectMaterials(id));
+    const iv = setInterval(() => {
+      const found = getObjectMaterials(id);
+      if (found.length) {
+        setNames(found);
+        clearInterval(iv);
+      }
+    }, 300);
+    return () => clearInterval(iv);
+  }, [id]);
+  return names;
+}
 
 const MODES: EditorMode[] = ["translate", "rotate", "scale"];
 const MODE_LABEL: Record<EditorMode, string> = {
@@ -60,6 +86,7 @@ export function WorldEditor() {
   const [busy, setBusy] = useState<string | null>(null);
 
   const selected = s.objects.find((o) => o.id === s.selectedId) ?? null;
+  const selectedMaterials = useObjectMaterials(selected?.id);
 
   useEffect(() => {
     listAssets().then(s.setAssets);
@@ -405,6 +432,49 @@ export function WorldEditor() {
                 </label>
               ))}
             </div>
+
+            {selected.walkable && selectedMaterials.length > 1 && (
+              <div className="space-y-1 border-t border-white/10 pt-2">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400">
+                  Ground materials{" "}
+                  <span className="normal-case text-slate-500">
+                    (kosongkan semua = semua part jadi pijakan, seperti biasa)
+                  </span>
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {selectedMaterials.map((mat) => {
+                    const list = selected.groundMaterials ?? [];
+                    const active = list.length === 0 || list.includes(mat);
+                    return (
+                      <button
+                        key={mat}
+                        onClick={() => {
+                          const current =
+                            selected.groundMaterials && selected.groundMaterials.length > 0
+                              ? selected.groundMaterials
+                              : selectedMaterials;
+                          const next = current.includes(mat)
+                            ? current.filter((n) => n !== mat)
+                            : [...current, mat];
+                          s.updateObject(selected.id, {
+                            groundMaterials:
+                              next.length === selectedMaterials.length ? undefined : next,
+                          });
+                        }}
+                        className={`rounded-md border px-2 py-0.5 text-[10px] transition-colors ${
+                          active
+                            ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200"
+                            : "border-white/10 bg-slate-950/60 text-slate-500 hover:bg-slate-900"
+                        }`}
+                        title={active ? "Jadi pijakan — klik untuk matikan" : "Tidak jadi pijakan — klik untuk aktifkan"}
+                      >
+                        {mat}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
