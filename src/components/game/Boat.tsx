@@ -513,8 +513,8 @@ export function Boat() {
 
 
         {prompt && (
-          <Html position={[0, 1.9, 0]} center distanceFactor={12} zIndexRange={[10, 0]}>
-            <div className="pointer-events-none whitespace-nowrap rounded-full border border-white/30 bg-slate-900/70 px-3 py-1 text-[13px] font-semibold text-slate-50 shadow-lg backdrop-blur-sm">
+          <Html position={[0, 1.9, 0]} center distanceFactor={8} zIndexRange={[10, 0]}>
+            <div className="pointer-events-none whitespace-nowrap rounded-full border-[3px] border-white/40 bg-slate-900/70 px-6 py-2.5 text-2xl font-bold text-slate-50 shadow-lg backdrop-blur-sm">
               Press E to board the boat
             </div>
           </Html>

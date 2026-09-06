@@ -5,7 +5,7 @@ import { useRodStore } from "@/hooks/useRodStore";
 import { rodLook } from "@/lib/rodLooks";
 
 /** Gambar pancing 2D per tier — bentuk dan ornamennya beda tiap rarity. */
-function RodIllustration({ rodId, glow }: { rodId: string; glow: number }) {
+export function RodIllustration({ rodId, glow }: { rodId: string; glow: number }) {
   const look = rodLook(rodId);
   const w = look.blankRadius[0] * 46;
   return (

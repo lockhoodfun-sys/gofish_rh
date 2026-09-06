@@ -4,7 +4,7 @@ import { useProfileStore } from "@/hooks/useProfileStore";
 import { useBoatStore } from "@/hooks/useBoatStore";
 
 /** Silhouette perahu 2D — makin cepat hullnya, makin ramping bentuknya. */
-function BoatIllustration({ speed }: { speed: number }) {
+export function BoatIllustration({ speed }: { speed: number }) {
   const sleek = Math.min(1, Math.max(0, (speed - 100) / 200));
   const hull = `M8 ${58} L${72 - sleek * 6} ${58} L${64 - sleek * 10} ${72} L${18 - sleek * 4} 72 Z`;
   return (

@@ -12,7 +12,6 @@ import {
 import { useGameStore } from "@/hooks/useGameStore";
 import { useWeather, WEATHER, type WeatherKind } from "@/hooks/useWeather";
 import { useDayNight, dayLabelFor, type DayLabel } from "@/hooks/useDayNight";
-import type { Rarity } from "@/lib/fishRules";
 
 const DAY_ICON = {
   Dawn: Sunrise,
@@ -38,20 +37,9 @@ function formatClock(hour: number) {
   return `${h12}:${String(m).padStart(2, "0")} ${suffix}`;
 }
 
-
-
-const RARITY_BADGE: Record<Rarity, string> = {
-  common: "border-slate-400/40 bg-slate-400/20 text-slate-100",
-  rare: "border-sky-400/50 bg-sky-500/20 text-sky-100",
-  epic: "border-violet-400/50 bg-violet-500/20 text-violet-100",
-  legendary: "border-orange-400/50 bg-orange-500/20 text-orange-100",
-  mythic: "border-amber-300/60 bg-gradient-to-r from-amber-500/30 to-red-500/30 text-amber-100",
-};
-
 export function HUD() {
   const { phase, message, score, totalWeight, last } = useGameStore();
   const bite = phase === "bite";
-  const rarity = (last?.isMonster ? "mythic" : last?.rarity) as Rarity | undefined;
   const weatherKind = useWeather((s) => s.kind);
   const hour = useDayNight((s) => s.hour);
   const dayLabel = dayLabelFor(hour);
@@ -79,23 +67,6 @@ export function HUD() {
           </p>
         </div>
 
-        <div className="flex flex-col items-end gap-2">
-          {last && (
-            <div className="rounded-2xl border border-white/25 bg-slate-900/45 px-4 py-3 text-right text-slate-50 shadow-lg backdrop-blur-md">
-              <p className="text-[11px] uppercase tracking-widest text-slate-300/80">Latest</p>
-              <p className="text-sm font-semibold">{last.name}</p>
-              <p className="text-xs text-slate-200/80">{last.weight} kg</p>
-              {rarity && (
-                <span
-                  className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${RARITY_BADGE[rarity]}`}
-                >
-                  {rarity}
-                </span>
-              )}
-
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Top-center notifications */}

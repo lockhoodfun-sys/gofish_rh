@@ -1,14 +1,24 @@
-/** XP curve mirroring the database: every level costs a flat 500 XP, forever. */
+/**
+ * XP curve mirroring the database (public.level_for_xp, see
+ * drizzle/migrations/0001_seed_gameplay_and_xp.sql):
+ *   level N requires 100 * (N-1)^2 total XP  -> 1: 0, 2: 100, 3: 400, 4: 900, ...
+ * This used to be a flat 500 XP/level here, which desynced the client
+ * progress bar from the real (server-authoritative) level. Keep this in
+ * sync with level_for_xp() if that SQL function ever changes.
+ */
 
-export const XP_PER_LEVEL = 500;
+const XP_LEVEL_BASE = 100;
 
+/** Total XP required to REACH `level` (i.e. XP floor for that level). */
 export function xpForLevel(level: number): number {
   const n = Math.max(1, Math.floor(level));
-  return XP_PER_LEVEL * (n - 1);
+  return XP_LEVEL_BASE * (n - 1) ** 2;
 }
 
+/** Mirrors public.level_for_xp(_xp): floor(sqrt(xp/100)) + 1, clamped to >= 1. */
 export function levelForXp(xp: number): number {
-  return Math.max(1, Math.floor(Math.max(0, xp) / XP_PER_LEVEL) + 1);
+  const safeXp = Math.max(0, xp);
+  return Math.max(1, Math.floor(Math.sqrt(safeXp / XP_LEVEL_BASE)) + 1);
 }
 
 export interface XpProgress {

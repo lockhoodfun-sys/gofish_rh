@@ -5,7 +5,7 @@ import { useBaitStore } from "@/hooks/useBaitStore";
 import { baitLook } from "@/lib/baitLooks";
 
 /** Gambar umpan 2D per tier — bentuknya mengikuti model di air. */
-function BaitOrb({ baitId }: { baitId: string }) {
+export function BaitOrb({ baitId }: { baitId: string }) {
   const look = baitLook(baitId);
   const id = `bait-${baitId}`;
   const fill = `url(#${id})`;
