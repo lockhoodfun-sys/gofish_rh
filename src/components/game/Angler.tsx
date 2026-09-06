@@ -5,6 +5,12 @@ import * as THREE from "three";
 import { waterHeight } from "./Ocean";
 import { MonsterFishMesh } from "./MonsterFish";
 import { MonsterBurstMesh, animateBurst } from "./MonsterBurst";
+import {
+  UnderwaterFishGlowMesh,
+  animateUnderwaterGlow,
+  UNDERWATER_GLOW_COLOR,
+  MONSTER_GLOW_COLOR,
+} from "./UnderwaterFishGlow";
 import { rollFish, useGameStore, type FishCatch } from "@/hooks/useGameStore";
 import { equippedRod, useRodStore } from "@/hooks/useRodStore";
 
@@ -12,7 +18,7 @@ import { rodLook } from "@/lib/rodLooks";
 import { clampToWalkable, isInWater, player, resolvePlayerGround } from "@/hooks/usePlayer";
 import { boat, boatDeckWorld, moveOnDeck } from "@/hooks/useBoat";
 import { useWeather } from "@/hooks/useWeather";
-import { biteWindowFor } from "@/lib/fishRules";
+import { biteWindowFor, type Rarity } from "@/lib/fishRules";
 
 import { useBaitStore } from "@/hooks/useBaitStore";
 import { baitLook } from "@/lib/baitLooks";
@@ -75,6 +81,9 @@ export function Angler() {
   const monster = useRef<THREE.Group>(null);
   const splash = useRef<THREE.Group>(null);
   const burst = useRef<THREE.Group>(null);
+  /** underwater light VFX standing in for the (hidden) fish while it's
+   *  being reeled in — see UnderwaterFishGlow.tsx */
+  const underGlow = useRef<THREE.Group>(null);
   const reelCrank = useRef<THREE.Group>(null);
   /** brief warm glow at the rod tip/hands the instant a catch lands — see
    *  the "PULL" step of the catch-impact sequence (CatchPopup handles the
@@ -451,6 +460,10 @@ export function Angler() {
     let lean = 0;
 
     // ---- phase logic --------------------------------------------------
+    // underwater glow only ever lights up during the "reel" branch below;
+    // default it off so it can't linger into any other phase.
+    if (underGlow.current) underGlow.current.visible = false;
+
     if (st.phase === "cast") {
       const p = st.t;
       if (p < 0.3) {
@@ -617,6 +630,16 @@ export function Angler() {
           st.splashT = 0;
           st.splashAt.set(st.to.x, surf, st.to.z);
         }
+
+        // ---- underwater light VFX: stands in for the (hidden) monster
+        // while it fights below the surface — no monster geometry is
+        // shown until "caught" ----------------------------------------
+        if (underGlow.current) {
+          underGlow.current.visible = true;
+          underGlow.current.position.set(st.to.x, surf, st.to.z);
+          const glowDepth = 0.9 + Math.abs(Math.sin(st.t * 5)) * 0.6;
+          animateUnderwaterGlow(underGlow.current, t, glowDepth, jerk, MONSTER_GLOW_COLOR);
+        }
       } else {
         // ikan melawan DI TEMPAT sambaran — tidak digeser mendekati pemain;
         // hanya bergejolak kecil di sekitar titik kail
@@ -628,6 +651,24 @@ export function Angler() {
         if (st.splashT > 0.45) {
           st.splashT = 0;
           st.splashAt.copy(st.bobber);
+        }
+
+        // ---- underwater light VFX: stands in for the (hidden) fish
+        // while it fights below the surface ------------------------
+        if (underGlow.current) {
+          const surf = waterHeight(st.to.x, st.to.z, t);
+          underGlow.current.visible = true;
+          underGlow.current.position.set(st.to.x, surf, st.to.z);
+          const glowDepth = 0.7 + Math.abs(Math.sin(st.t * 9)) * 0.5;
+          const jerkFight = Math.sin(st.t * 14);
+          const rarity = (st.fish?.rarity ?? "common") as Rarity;
+          animateUnderwaterGlow(
+            underGlow.current,
+            t,
+            glowDepth,
+            jerkFight,
+            UNDERWATER_GLOW_COLOR[rarity] ?? UNDERWATER_GLOW_COLOR.common,
+          );
         }
       }
       if (k >= 1) {
@@ -1332,6 +1373,12 @@ export function Angler() {
       {/* cosmic burst saat monster menerobos */}
       <group ref={burst} visible={false}>
         <MonsterBurstMesh />
+      </group>
+
+      {/* underwater light VFX while a fish/monster fights below the
+          surface — no fish geometry is rendered during "reel" */}
+      <group ref={underGlow} visible={false}>
+        <UnderwaterFishGlowMesh />
       </group>
     </group>
   );
