@@ -8,6 +8,7 @@
 // they take the resolved tier id as a parameter.
 import { createPublicClient, http, formatUnits } from "viem";
 import { robinhoodChain } from "./chains";
+import { rpc } from "./rpc";
 
 // Placeholder token (per approved plan, §0.2) — not the real $FISH, which
 // hasn't launched yet. Swap this constant when the real token goes live.
@@ -91,17 +92,48 @@ export interface HoldTier {
   wd_min: number | null;
   wd_max: number | null;
   wd_per_day: number;
+  /** Hours the wallet's balance must stay >= min_usd_value, continuously
+   *  and provably (via fish_hold_snapshots), before this tier is granted.
+   *  See 0010_hold_tier_time_window.sql. */
+  min_hold_hours: number;
 }
 
 export interface HoldStatus {
+  /** Current instantaneous hold value — for display only. */
   usdValue: number;
-  tier: HoldTier | null; // null = below the lowest tier, no NPC access at all
+  /** The GATING tier — requires min_hold_hours of continuous proven holding.
+   *  This is what NPC reward claims and withdrawals must use. Never gate
+   *  anything on instantTier below. */
+  tier: HoldTier | null;
+  /** Tier the wallet's balance would reach RIGHT NOW, ignoring how long
+   *  it's been held. Display-only — e.g. "you're at Tier X now, eligible in
+   *  ~N hours if it stays there." Never trust this for access control. */
+  instantTier: HoldTier | null;
 }
 
-/** Reads the wallet's live token balance + price, and resolves it against
- * fish_hold_tiers (ordered highest-first so the first match wins). */
+/** Best-effort snapshot write for the time-window check. Never let a logging
+ * failure block a balance read — the player still gets their (accurate)
+ * instant value even if this insert fails. */
+async function recordSnapshot(wallet: string, usdValue: number) {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // fish_hold_snapshots isn't in the generated Database type yet — same
+    // bypass pattern as rpc.ts for functions not yet synced into types.ts.
+    await (supabaseAdmin.from as any)("fish_hold_snapshots").insert({
+      wallet_address: wallet,
+      usd_value: usdValue,
+    });
+  } catch {
+    /* non-fatal — see comment above */
+  }
+}
+
+/** Reads the wallet's live token balance + price, resolves it against
+ * fish_hold_tiers, records a snapshot for the holding-duration check, and
+ * resolves the actual (windowed) gating tier via resolve_windowed_tier(). */
 export async function resolveHoldStatus(walletAddress: string): Promise<HoldStatus> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const wallet = walletAddress.toLowerCase();
 
   const [balance, priceUsd, tiersRes] = await Promise.all([
     fetchTokenBalance(walletAddress),
@@ -116,7 +148,13 @@ export async function resolveHoldStatus(walletAddress: string): Promise<HoldStat
   const tiers = (tiersRes.data ?? []) as HoldTier[];
 
   const usdValue = balance * priceUsd;
-  const tier = tiers.find((t) => usdValue >= t.min_usd_value) ?? null;
+  const instantTier = tiers.find((t) => usdValue >= t.min_usd_value) ?? null;
 
-  return { usdValue, tier };
+  await recordSnapshot(wallet, usdValue);
+
+  const windowed = await rpc<string | null>("resolve_windowed_tier", { _wallet: wallet });
+  const windowedTierId = windowed.error ? null : windowed.data;
+  const tier = windowedTierId ? (tiers.find((t) => t.id === windowedTierId) ?? null) : null;
+
+  return { usdValue, tier, instantTier };
 }
