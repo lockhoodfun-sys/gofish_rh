@@ -97,8 +97,47 @@ export function MonsterBurstMesh() {
 
 /** k = 0..1 progres efek (0 = monster menembus permukaan), t = waktu global */
 export function animateBurst(g: THREE.Group, k: number, t: number) {
-  const setOp = (name: string, op: number) => {
-    const m = g.getObjectByName(name) as THREE.Mesh | undefined;
+  // Cache semua lookup nama sekali per group, bukan tree-walk ~80x tiap
+  // frame selama seluruh durasi efek (~1.45s) — itu yang bikin fase
+  // perlawanan/narik/popup ikan monster jadi berat.
+  type Refs = {
+    beamOuter: THREE.Mesh;
+    beamMid: THREE.Mesh;
+    beamCore: THREE.Mesh;
+    streaks: THREE.Mesh[];
+    rings: THREE.Mesh[];
+    sparks: THREE.Mesh[];
+    drops: THREE.Mesh[];
+    light: THREE.PointLight;
+  };
+  let refs = g.userData["_burstRefs"] as Refs | undefined;
+  if (!refs) {
+    refs = {
+      beamOuter: g.getObjectByName("beamOuter") as THREE.Mesh,
+      beamMid: g.getObjectByName("beamMid") as THREE.Mesh,
+      beamCore: g.getObjectByName("beamCore") as THREE.Mesh,
+      streaks: Array.from(
+        { length: BURST_STREAKS },
+        (_, i) => g.getObjectByName(`streak${i}`) as THREE.Mesh,
+      ),
+      rings: Array.from(
+        { length: BURST_RINGS },
+        (_, i) => g.getObjectByName(`ring${i}`) as THREE.Mesh,
+      ),
+      sparks: Array.from(
+        { length: BURST_SPARKS },
+        (_, i) => g.getObjectByName(`spark${i}`) as THREE.Mesh,
+      ),
+      drops: Array.from(
+        { length: BURST_DROPS },
+        (_, i) => g.getObjectByName(`drop${i}`) as THREE.Mesh,
+      ),
+      light: g.getObjectByName("light") as THREE.PointLight,
+    };
+    g.userData["_burstRefs"] = refs;
+  }
+
+  const setOp = (m: THREE.Mesh | undefined, op: number) => {
     if (!m) return;
     (m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, op);
     m.visible = op > 0.002;
@@ -109,11 +148,15 @@ export function animateBurst(g: THREE.Group, k: number, t: number) {
   const flicker = 0.85 + Math.sin(t * 40) * 0.08 + Math.sin(t * 23) * 0.07;
   const beamA = beamIn * fade * flicker;
 
-  setOp("beamOuter", beamA * 0.35);
-  setOp("beamMid", beamA * 0.6);
-  setOp("beamCore", beamA * 0.95);
-  for (const n of ["beamOuter", "beamMid", "beamCore"]) {
-    const m = g.getObjectByName(n) as THREE.Mesh | undefined;
+  setOp(refs.beamOuter, beamA * 0.35);
+  setOp(refs.beamMid, beamA * 0.6);
+  setOp(refs.beamCore, beamA * 0.95);
+  const beams: [THREE.Mesh | undefined, "beamOuter" | "beamMid" | "beamCore"][] = [
+    [refs.beamOuter, "beamOuter"],
+    [refs.beamMid, "beamMid"],
+    [refs.beamCore, "beamCore"],
+  ];
+  for (const [m, n] of beams) {
     if (m) {
       const grow = 0.4 + beamIn * 0.6;
       m.scale.set(grow + Math.sin(t * 9) * 0.05, beamIn, grow + Math.cos(t * 7) * 0.05);
@@ -121,10 +164,9 @@ export function animateBurst(g: THREE.Group, k: number, t: number) {
     }
   }
 
-
   // streak vertikal: naik cepat, memanjang, lalu hilang
   for (let i = 0; i < BURST_STREAKS; i++) {
-    const s = g.getObjectByName(`streak${i}`) as THREE.Mesh | undefined;
+    const s = refs.streaks[i];
     if (!s) continue;
     const off = (i % 5) * 0.05;
     const sk = Math.max(0, Math.min(1, (k - off) / 0.7));
@@ -134,22 +176,22 @@ export function animateBurst(g: THREE.Group, k: number, t: number) {
     s.position.set(Math.cos(a) * rad, 4 + e * (60 + (i % 6) * 18), Math.sin(a) * rad);
     s.scale.set(0.5 + (i % 3) * 0.35, 1.4 + e * 3.4, 1);
     s.rotation.y = a + Math.PI / 2;
-    setOp(`streak${i}`, sk > 0 && sk < 1 ? (1 - sk) * 0.95 : 0);
+    setOp(s, sk > 0 && sk < 1 ? (1 - sk) * 0.95 : 0);
   }
 
   for (let i = 0; i < BURST_RINGS; i++) {
     const rk = Math.max(0, Math.min(1, (k - i * 0.07) / 0.75));
     const r = 3 + easeOut(rk) * (30 + i * 10);
-    const ring = g.getObjectByName(`ring${i}`) as THREE.Mesh | undefined;
+    const ring = refs.rings[i];
     if (ring) {
       ring.scale.setScalar(r);
       ring.position.y = 0.35 + i * 0.15;
-      setOp(`ring${i}`, rk > 0 && rk < 1 ? (1 - rk) * 0.85 : 0);
+      setOp(ring, rk > 0 && rk < 1 ? (1 - rk) * 0.85 : 0);
     }
   }
 
   for (let i = 0; i < BURST_SPARKS; i++) {
-    const s = g.getObjectByName(`spark${i}`) as THREE.Mesh | undefined;
+    const s = refs.sparks[i];
     if (!s) continue;
     const sk = Math.max(0, Math.min(1, (k - 0.02) / 0.85));
     const a = (i / BURST_SPARKS) * Math.PI * 2 + i * 0.37;
@@ -162,12 +204,12 @@ export function animateBurst(g: THREE.Group, k: number, t: number) {
       Math.sin(a) * spd * e,
     );
     s.scale.setScalar(Math.max(0.001, (1 - sk) * (0.6 + (i % 3) * 0.3)));
-    setOp(`spark${i}`, sk > 0 && sk < 1 ? 1 - sk : 0);
+    setOp(s, sk > 0 && sk < 1 ? 1 - sk : 0);
   }
 
   // percikan air: keluar melengkung dari permukaan lalu jatuh kembali
   for (let i = 0; i < BURST_DROPS; i++) {
-    const d = g.getObjectByName(`drop${i}`) as THREE.Mesh | undefined;
+    const d = refs.drops[i];
     if (!d) continue;
     const dk = Math.max(0, Math.min(1, k / 0.6));
     const a = (i / BURST_DROPS) * Math.PI * 2 + i * 1.13;
@@ -177,10 +219,10 @@ export function animateBurst(g: THREE.Group, k: number, t: number) {
     d.position.set(Math.cos(a) * spd * dk, Math.max(0, y), Math.sin(a) * spd * dk);
     const sc = (0.5 + (i % 4) * 0.28) * (1 - dk * 0.5);
     d.scale.set(sc, sc * (1 + dk * 1.2), sc);
-    setOp(`drop${i}`, dk > 0 && dk < 1 ? (1 - dk) * 0.9 : 0);
+    setOp(d, dk > 0 && dk < 1 ? (1 - dk) * 0.9 : 0);
   }
 
-  const light = g.getObjectByName("light") as THREE.PointLight | undefined;
+  const light = refs.light;
   if (light) {
     light.intensity = beamA * 600;
     light.position.y = 8;

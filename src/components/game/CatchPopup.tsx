@@ -1,6 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useGameStore } from "@/hooks/useGameStore";
+import { useGameStore, type FishCatch } from "@/hooks/useGameStore";
 import { useHookedFish } from "@/hooks/useHookedFish";
 import { playCatchSuccessSound } from "@/lib/weatherAudio";
 import { FishMesh } from "./Fish";
@@ -61,6 +61,16 @@ function FishPortrait({ isMonster }: { isMonster: boolean }) {
       camera={{ position: [0, 0.3, isMonster ? 7 : 4.2], fov: 32 }}
       gl={{ alpha: true }}
       style={{ background: "transparent" }}
+      // demand: this portrait is a static pose (animate={false} below), so
+      // there's nothing changing frame-to-frame that needs a continuous
+      // render loop — r3f auto-invalidates a frame whenever the scene
+      // actually changes (new fish model, resize, etc). Combined with
+      // mounting this <Canvas> ONCE for the whole session (see
+      // CatchPopup below) instead of per catch, this avoids both the
+      // per-frame cost of a second render loop AND the one-time hitch of
+      // creating a fresh WebGL context (shader compilation etc) every
+      // single time a fish is caught.
+      frameloop="demand"
     >
       <ambientLight intensity={0.9} />
       <directionalLight position={[3, 4, 5]} intensity={1.4} />
@@ -217,9 +227,33 @@ export function CatchPopup() {
   // Only "caught" shows anything — no early reveal during bite/reel
   // anymore, so the notification can't feel like it "just appears".
   const visible = !!current && phase === "caught";
-  if (!current) return null;
 
-  const rarity = (current.isMonster ? "mythic" : current.rarity) as Rarity | undefined;
+  // Mount the portrait's <Canvas> (a SECOND WebGL context) exactly ONCE
+  // for the whole session, the first time there's ever a fish to show —
+  // then never unmount it again. Creating a WebGL context (shader
+  // compilation, GPU resource allocation) is one of the most expensive
+  // single operations in three.js; mounting/unmounting it every single
+  // catch (what an earlier version of this fix did, and what the
+  // original code did from every "bite") turns that cost into a visible
+  // hitch right at "perlawanan ikan"/"menarik ikan"/the popup appearing.
+  // Keeping it permanently mounted (with frameloop="demand" on the
+  // Canvas itself, see FishPortrait) means: the one-time context-creation
+  // cost happens once ever, and after that the portrait just swaps which
+  // GLTF it shows — with no per-frame render loop running while hidden.
+  // Keep rendering the last known catch's name/weight/portrait even after
+  // `current` clears back to null (between catches) instead of unmounting
+  // — that's what keeps the portrait's <Canvas> (a second WebGL context)
+  // mounted permanently after the first catch, rather than tearing down
+  // and recreating it (expensive: shader compilation, GPU allocation)
+  // every single fishing cycle. `visible` above still controls the CSS
+  // opacity, so nothing is shown when there's nothing active.
+  const lastCatchRef = useRef<FishCatch | null>(null);
+  if (current) lastCatchRef.current = current;
+  const displayCatch = current ?? lastCatchRef.current;
+
+  if (!displayCatch) return null;
+
+  const rarity = (displayCatch.isMonster ? "mythic" : displayCatch.rarity) as Rarity | undefined;
   const glow = rarity ? RARITY_GLOW[rarity] : "#facc15";
 
   return (
@@ -361,7 +395,7 @@ export function CatchPopup() {
         className="h-[170px] w-[260px]"
         style={{
           opacity: visible ? undefined : 0,
-          transform: `translateX(${current.isMonster ? 0 : -facing * PORTRAIT_NUDGE_PX}px)`,
+          transform: `translateX(${displayCatch.isMonster ? 0 : -facing * PORTRAIT_NUDGE_PX}px)`,
         }}
       >
         <div
@@ -372,7 +406,7 @@ export function CatchPopup() {
               : undefined,
           }}
         >
-          <FishPortrait isMonster={!!current.isMonster} />
+          <FishPortrait isMonster={!!displayCatch.isMonster} />
         </div>
       </div>
 
@@ -395,7 +429,7 @@ export function CatchPopup() {
             textShadow: "0 2px 0 rgba(0,0,0,0.6)",
           }}
         >
-          {current.name}
+          {displayCatch.name}
         </p>
         <p
           className="text-lg leading-tight"
@@ -405,7 +439,7 @@ export function CatchPopup() {
             textShadow: "0 2px 0 rgba(0,0,0,0.6)",
           }}
         >
-          {current.weight}kg
+          {displayCatch.weight}kg
         </p>
       </div>
 

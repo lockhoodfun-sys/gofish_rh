@@ -117,10 +117,23 @@ function LoadedModel({ obj, url }: { obj: WorldObject; url: string }) {
 
   const node = useMemo(() => {
     const root = toObject3D(loaded, obj.ext).clone(true);
+    // Cast shadow hanya untuk submesh yang cukup besar untuk bayangannya
+    // benar-benar kelihatan. Model raw (beach kit, mountain, dll) sering
+    // berisi banyak submesh kecil (batu kerikil, daun, dekorasi) yang
+    // bayangannya nyaris tak terlihat tapi tetap masuk shadow-pass kalau
+    // di-set true tanpa syarat — itu yang bikin frame drop. receiveShadow
+    // tetap true untuk semua ukuran supaya tanah/lantai/dekorasi tetap
+    // kena bayangan dari objek besar di sekitarnya.
+    const SHADOW_CAST_MIN_SIZE = 1.5; // unit dunia — sesuaikan kalau perlu
+    const box = new THREE.Box3();
+    const size = new THREE.Vector3();
     root.traverse((c) => {
       const m = c as THREE.Mesh;
       if (m.isMesh) {
-        m.castShadow = true;
+        box.setFromObject(m);
+        box.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        m.castShadow = maxDim > SHADOW_CAST_MIN_SIZE;
         m.receiveShadow = true;
       }
     });

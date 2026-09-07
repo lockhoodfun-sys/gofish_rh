@@ -101,7 +101,11 @@ export function GameCanvas() {
         shadows
         dpr={[1, 1.75]}
         camera={{ position: [-1.5, 8.6, 25.5], fov: 55, near: 0.1, far: 5000 }}
-        gl={{ antialias: true }}
+        // antialias native dimatikan: EffectComposer di bawah sudah pakai
+        // multisampling={4} sendiri. Dua-duanya nyala bareng berarti scene
+        // di-resolve MSAA dua kali per frame (fill-rate dobel) tanpa
+        // tambahan kualitas visual yang kentara.
+        gl={{ antialias: false }}
       >
         <Weather />
         <WeatherCycleController />
