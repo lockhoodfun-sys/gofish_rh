@@ -65,6 +65,44 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string
+          id: string
+          message: string
+          username: string
+          wallet_address: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          message: string
+          username: string
+          wallet_address: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          message?: string
+          username?: string
+          wallet_address?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_wallet_address_fkey"
+            columns: ["wallet_address"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["wallet_address"]
+          },
+        ]
+      }
       fish_inventory_items: {
         Row: {
           caught_at: string
@@ -766,6 +804,34 @@ export type Database = {
         Args: { _rod_id: string; _wallet: string }
         Returns: undefined
       }
+      get_leaderboard: {
+        Args: { _limit: number; _sort_by: string }
+        Returns: {
+          avatar_url: string | null
+          coins: number
+          display_name: string
+          level: number
+          rank: number
+          total_fish: number
+          username: string
+          wallet_address: string
+          xp: number
+        }[]
+      }
+      get_my_leaderboard_rank: {
+        Args: { _sort_by: string; _wallet: string }
+        Returns: {
+          avatar_url: string | null
+          coins: number
+          display_name: string
+          level: number
+          rank: number
+          total_fish: number
+          username: string
+          wallet_address: string
+          xp: number
+        }[]
+      }
       get_player_baits: {
         Args: { _wallet: string }
         Returns: {
@@ -869,6 +935,18 @@ export type Database = {
           to: "profiles"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      send_chat_message: {
+        Args: { _message: string; _wallet: string }
+        Returns: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string
+          id: string
+          message: string
+          username: string
+          wallet_address: string
         }
       }
       xp_for_rarity: { Args: { _rarity: string }; Returns: number }

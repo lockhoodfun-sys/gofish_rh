@@ -32,13 +32,12 @@ import { QuestPanel } from "../quest/QuestPanel";
 import { QuestTracker } from "../quest/QuestTracker";
 import { Npcs } from "./Npcs";
 import { NpcDialog } from "./NpcDialog";
+import { LeaderboardButton } from "../leaderboard/LeaderboardButton";
+import { LeaderboardPanel } from "../leaderboard/LeaderboardPanel";
+import { ChatBox } from "../chat/ChatBox";
 
 /** Keeps the orbit pivot glued to the character so the camera follows them. */
-function FollowTarget({
-  controls,
-}: {
-  controls: React.RefObject<OrbitControlsImpl | null>;
-}) {
+function FollowTarget({ controls }: { controls: React.RefObject<OrbitControlsImpl | null> }) {
   useFrame((state, raw) => {
     const dt = Math.min(raw, 0.05);
     const c = controls.current;
@@ -68,7 +67,6 @@ export function GameCanvas() {
     .lerp(dayNightAt(hour).tint, TINT_WEIGHT)
     .getStyle();
   useFishData();
-
 
   // Browsers may suspend WebAudio after focus/background transitions. Resume
   // on every relevant gesture, in capture phase so gameplay handlers always
@@ -157,7 +155,6 @@ export function GameCanvas() {
             radius={0.35}
           />
         </EffectComposer>
-
       </Canvas>
       <HUD />
       <CatchPopup />
@@ -166,15 +163,17 @@ export function GameCanvas() {
       <LoadingScreen />
       <StartGate />
 
-
       <div className="pointer-events-none fixed right-4 top-4 z-40 flex flex-col items-end gap-2">
         <WalletButton />
         <QuestTracker />
+        <LeaderboardButton />
       </div>
       <ProfilePanel />
       <GoldPanel />
       <QuestPanel />
       <NpcDialog />
+      <LeaderboardPanel />
+      <ChatBox />
     </div>
   );
 }

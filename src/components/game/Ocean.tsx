@@ -1,7 +1,8 @@
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { WEATHER, useWeather } from "@/hooks/useWeather";
+import { dayNightAt, clock, TINT_WEIGHT } from "@/hooks/useDayNight";
 
 export const waterHeight = (x: number, z: number, t: number) =>
   Math.sin(x * 0.14 + t * 1.1) * 0.35 +
@@ -167,6 +168,7 @@ export function Ocean() {
   const mat = useRef<THREE.ShaderMaterial>(null);
   const mesh = useRef<THREE.Mesh>(null);
   const kind = useWeather((s) => s.kind);
+  const { scene } = useThree();
 
   const uniforms = useMemo(
     () => ({
@@ -199,19 +201,51 @@ export function Ocean() {
     };
   }, []);
 
+  // Reused scratch colours so the day/night blend below doesn't allocate a
+  // new THREE.Color every frame.
+  const scratch = useMemo(
+    () => ({
+      s: new THREE.Color(),
+      m: new THREE.Color(),
+      d: new THREE.Color(),
+      h: new THREE.Color(),
+      dayTint: new THREE.Color(),
+    }),
+    [],
+  );
+
   useFrame((state, raw) => {
     const delta = Math.min(raw, 0.05);
     const u = mat.current?.uniforms;
     if (u) {
       const ut = u['uTime']!;
       ut.value += delta;
-      // Smoothly transition the ocean palette to match the active weather.
+
       const t = targets(kind);
+      // Same day/night blend Weather.tsx applies to fog/sun/ambient — without
+      // this, the sea stayed at full weather-only brightness all day while
+      // the sky dimmed and warmed at dawn/dusk/night, causing a hard seam at
+      // the horizon instead of a smooth match.
+      const day = dayNightAt(clock.hour, scratch.dayTint);
+      const b = day.brightness;
+      scratch.s.copy(t.s).lerp(day.tint, TINT_WEIGHT).multiplyScalar(b);
+      scratch.m.copy(t.m).lerp(day.tint, TINT_WEIGHT).multiplyScalar(b);
+      scratch.d.copy(t.d).lerp(day.tint, TINT_WEIGHT).multiplyScalar(b);
+
       const k = 1 - Math.exp(-2.2 * delta);
-      (u['uShallow']!.value as THREE.Color).lerp(t.s, k);
-      (u['uMid']!.value as THREE.Color).lerp(t.m, k);
-      (u['uDeep']!.value as THREE.Color).lerp(t.d, k);
-      (u['uHorizon']!.value as THREE.Color).lerp(t.h, k);
+      (u['uShallow']!.value as THREE.Color).lerp(scratch.s, k);
+      (u['uMid']!.value as THREE.Color).lerp(scratch.m, k);
+      (u['uDeep']!.value as THREE.Color).lerp(scratch.d, k);
+
+      // Horizon: lock onto the scene's ACTUAL fog colour (already combines
+      // weather + time-of-day in Weather.tsx) instead of a static per-weather
+      // hex, so the sea always melts into whatever the sky is doing right
+      // now rather than occasionally drifting out of sync with it.
+      const fog = scene.fog as THREE.FogExp2 | null;
+      const horizonTarget = fog
+        ? fog.color
+        : scratch.h.copy(t.h).lerp(day.tint, TINT_WEIGHT).multiplyScalar(b);
+      (u['uHorizon']!.value as THREE.Color).lerp(horizonTarget, k);
     }
     // Keep the ocean centred under the camera so its edge is always ~600
     // units out — far past the point where the haze has fully taken over.
@@ -235,4 +269,3 @@ export function Ocean() {
     </mesh>
   );
 }
-
