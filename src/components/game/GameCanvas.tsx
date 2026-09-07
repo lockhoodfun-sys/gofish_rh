@@ -29,7 +29,7 @@ import { WalletButton } from "../wallet/WalletButton";
 import { ProfilePanel } from "../profile/ProfilePanel";
 import { GoldPanel } from "../gold/GoldPanel";
 import { QuestPanel } from "../quest/QuestPanel";
-import { QuestButton } from "../quest/QuestButton";
+import { QuestTracker } from "../quest/QuestTracker";
 import { Npcs } from "./Npcs";
 import { NpcDialog } from "./NpcDialog";
 
@@ -103,7 +103,7 @@ export function GameCanvas() {
       <Canvas
         shadows
         dpr={[1, 1.75]}
-        camera={{ position: [-1.5, 8.6, 25.5], fov: 55 }}
+        camera={{ position: [-1.5, 8.6, 25.5], fov: 55, near: 0.1, far: 5000 }}
         gl={{ antialias: true }}
       >
         <Weather />
@@ -169,7 +169,7 @@ export function GameCanvas() {
 
       <div className="pointer-events-none fixed right-4 top-4 z-40 flex flex-col items-end gap-2">
         <WalletButton />
-        <QuestButton />
+        <QuestTracker />
       </div>
       <ProfilePanel />
       <GoldPanel />
