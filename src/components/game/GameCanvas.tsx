@@ -32,7 +32,6 @@ import { QuestPanel } from "../quest/QuestPanel";
 import { QuestTracker } from "../quest/QuestTracker";
 import { Npcs } from "./Npcs";
 import { NpcDialog } from "./NpcDialog";
-import { LeaderboardButton } from "../leaderboard/LeaderboardButton";
 import { LeaderboardPanel } from "../leaderboard/LeaderboardPanel";
 import { ChatBox } from "../chat/ChatBox";
 
@@ -166,7 +165,6 @@ export function GameCanvas() {
       <div className="pointer-events-none fixed right-4 top-4 z-40 flex flex-col items-end gap-2">
         <WalletButton />
         <QuestTracker />
-        <LeaderboardButton />
       </div>
       <ProfilePanel />
       <GoldPanel />

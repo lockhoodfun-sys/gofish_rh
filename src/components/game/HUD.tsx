@@ -12,6 +12,7 @@ import {
 import { useGameStore } from "@/hooks/useGameStore";
 import { useWeather, WEATHER, type WeatherKind } from "@/hooks/useWeather";
 import { useDayNight, dayLabelFor, type DayLabel } from "@/hooks/useDayNight";
+import { LeaderboardTracker } from "@/components/leaderboard/LeaderboardTracker";
 
 const DAY_ICON = {
   Dawn: Sunrise,
@@ -38,7 +39,7 @@ function formatClock(hour: number) {
 }
 
 export function HUD() {
-  const { phase, message, score, totalWeight, last } = useGameStore();
+  const { phase, message, score, last } = useGameStore();
   const bite = phase === "bite";
   const weatherKind = useWeather((s) => s.kind);
   const hour = useDayNight((s) => s.hour);
@@ -59,14 +60,9 @@ export function HUD() {
         />
       )}
       <div className="flex items-start justify-between p-4 sm:p-6">
-        <div className="rounded-2xl border border-white/25 bg-slate-900/45 px-4 py-3 text-slate-50 shadow-lg backdrop-blur-md">
-          <h1 className="text-base font-semibold tracking-tight sm:text-lg">Koleo Island</h1>
-          <p className="mt-1 text-xs text-slate-200/80">
-            Caught <span className="font-semibold text-slate-50">{score}</span> · Total{" "}
-            <span className="font-semibold text-slate-50">{totalWeight} kg</span>
-          </p>
+        <div className="flex flex-col items-start gap-2">
+          <LeaderboardTracker />
         </div>
-
       </div>
 
       {/* Top-center notifications */}

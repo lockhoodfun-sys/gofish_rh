@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Loader2, Trophy } from "lucide-react";
+import { useEffect } from "react";
+import { Crown, Loader2, Medal, Trophy } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +12,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useProfileStore } from "@/hooks/useProfileStore";
 import { useLeaderboardStore } from "@/hooks/useLeaderboardStore";
+import { useLeaderboardAvatars } from "@/hooks/useLeaderboardAvatars";
 import type { LeaderboardEntry, LeaderboardSort } from "@/lib/leaderboard.functions";
-import { resolveAvatarUrl } from "@/lib/avatarUrl";
 
 function statFor(entry: LeaderboardEntry, sortBy: LeaderboardSort) {
   if (sortBy === "coins") return `${Math.round(entry.coins).toLocaleString()} coins`;
@@ -21,11 +21,30 @@ function statFor(entry: LeaderboardEntry, sortBy: LeaderboardSort) {
   return `Lv. ${entry.level} · ${entry.xp.toLocaleString()} XP`;
 }
 
-function rankTone(rank: number) {
-  if (rank === 1) return "text-amber-300";
-  if (rank === 2) return "text-slate-300";
-  if (rank === 3) return "text-orange-400";
-  return "text-slate-400";
+function RankBadge({ rank }: { rank: number }) {
+  if (rank === 1)
+    return (
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400/20 text-amber-300 ring-1 ring-amber-300/30">
+        <Crown className="h-4 w-4" aria-hidden />
+      </span>
+    );
+  if (rank === 2 || rank === 3)
+    return (
+      <span
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 ${
+          rank === 2
+            ? "bg-slate-300/15 text-slate-300 ring-slate-300/30"
+            : "bg-orange-400/15 text-orange-400 ring-orange-400/30"
+        }`}
+      >
+        <Medal className="h-4 w-4" aria-hidden />
+      </span>
+    );
+  return (
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5 text-sm font-bold tabular-nums text-slate-400">
+      {rank}
+    </span>
+  );
 }
 
 function Row({
@@ -41,15 +60,11 @@ function Row({
 }) {
   return (
     <div
-      className={`flex items-center gap-3 rounded-xl px-3 py-2 ${
+      className={`flex items-center gap-3 rounded-xl px-3 py-2 transition-colors ${
         highlight ? "bg-sky-500/15 ring-1 ring-sky-400/40" : "hover:bg-white/5"
       }`}
     >
-      <span
-        className={`w-6 shrink-0 text-center text-sm font-bold tabular-nums ${rankTone(entry.rank)}`}
-      >
-        {entry.rank}
-      </span>
+      <RankBadge rank={entry.rank} />
       <Avatar className="h-8 w-8 shrink-0">
         <AvatarImage src={avatarUrl ?? undefined} alt="" />
         <AvatarFallback className="text-xs">
@@ -81,35 +96,18 @@ export function LeaderboardPanel() {
   const loading = useLeaderboardStore((s) => s.loading);
   const error = useLeaderboardStore((s) => s.error);
   const refresh = useLeaderboardStore((s) => s.refresh);
-  const [avatars, setAvatars] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     if (panelOpen && proof) void refresh();
   }, [panelOpen, proof, refresh]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const paths = new Map<string, string>();
-    for (const e of entries) {
-      if (e.avatar_url) paths.set(e.wallet_address, e.avatar_url);
-    }
-    if (me?.avatar_url) paths.set(me.wallet_address, me.avatar_url);
-    void Promise.all(
-      [...paths.entries()].map(async ([wallet, path]) => {
-        const url = await resolveAvatarUrl(path);
-        if (!cancelled) setAvatars((prev) => ({ ...prev, [wallet]: url }));
-      }),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [entries, me]);
+  const avatars = useLeaderboardAvatars(entries, me);
 
   const meInTop = !!me && entries.some((e) => e.wallet_address === me.wallet_address);
 
   return (
     <Dialog open={panelOpen} onOpenChange={setPanelOpen}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md border-white/15 bg-slate-900/90 backdrop-blur-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-amber-400" aria-hidden />

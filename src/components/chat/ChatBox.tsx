@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useProfileStore } from "@/hooks/useProfileStore";
 import { useChatStore } from "@/hooks/useChatStore";
+import { resolveAvatarUrl } from "@/lib/avatarUrl";
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -27,6 +29,7 @@ export function ChatBox() {
   const send = useChatStore((s) => s.send);
   const resetChat = useChatStore((s) => s.reset);
   const [draft, setDraft] = useState("");
+  const [avatars, setAvatars] = useState<Record<string, string | null>>({});
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,6 +45,23 @@ export function ChatBox() {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages, panelOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const paths = new Map<string, string>();
+    for (const m of messages) {
+      if (m.avatar_url) paths.set(m.wallet_address, m.avatar_url);
+    }
+    void Promise.all(
+      [...paths.entries()].map(async ([wallet, path]) => {
+        const url = await resolveAvatarUrl(path);
+        if (!cancelled) setAvatars((prev) => ({ ...prev, [wallet]: url }));
+      }),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [messages]);
 
   if (!profile) return null;
 
@@ -78,10 +98,10 @@ export function ChatBox() {
   }
 
   return (
-    <div className="pointer-events-auto fixed bottom-4 right-4 z-30 flex h-96 w-72 flex-col overflow-hidden rounded-2xl border border-white/20 bg-slate-900/80 shadow-2xl backdrop-blur-md sm:w-80">
-      <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-        <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-50">
-          <MessageCircle className="h-4 w-4 text-sky-400" aria-hidden />
+    <div className="pointer-events-auto fixed bottom-4 right-4 z-30 flex h-72 w-60 flex-col overflow-hidden rounded-2xl border border-white/20 bg-slate-900/80 shadow-2xl backdrop-blur-md sm:w-64">
+      <div className="flex items-center justify-between border-b border-white/10 px-2.5 py-1.5">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-50">
+          <MessageCircle className="h-3.5 w-3.5 text-sky-400" aria-hidden />
           Chat
         </span>
         <button
@@ -90,37 +110,48 @@ export function ChatBox() {
           className="text-slate-400 transition-colors hover:text-slate-100"
           title="Close chat"
         >
-          <X className="h-4 w-4" aria-hidden />
+          <X className="h-3.5 w-3.5" aria-hidden />
         </button>
       </div>
 
-      <div ref={listRef} className="flex-1 space-y-2 overflow-y-auto px-3 py-2">
+      <div ref={listRef} className="flex-1 space-y-1.5 overflow-y-auto px-2.5 py-1.5">
         {messages.length === 0 && (
-          <p className="pt-8 text-center text-xs text-slate-400">No messages yet — say hi!</p>
+          <p className="pt-6 text-center text-[11px] text-slate-400">No messages yet — say hi!</p>
         )}
         {messages.map((m) => {
           const own = m.wallet_address === walletAddress;
           return (
-            <div key={m.id} className={own ? "text-right" : "text-left"}>
-              <p className="text-[11px] font-semibold text-sky-300">
-                {m.display_name || m.username}{" "}
-                <span className="font-normal text-slate-500">{timeLabel(m.created_at)}</span>
-              </p>
-              <p
-                className={`mt-0.5 inline-block max-w-[85%] break-words rounded-lg px-2.5 py-1.5 text-sm ${
-                  own ? "bg-sky-600/70 text-white" : "bg-white/10 text-slate-100"
-                }`}
-              >
-                {m.message}
-              </p>
+            <div
+              key={m.id}
+              className={`flex items-end gap-1.5 ${own ? "flex-row-reverse text-right" : "text-left"}`}
+            >
+              <Avatar className="h-5 w-5 shrink-0">
+                <AvatarImage src={avatars[m.wallet_address] ?? undefined} alt="" />
+                <AvatarFallback className="text-[8px]">
+                  {(m.display_name || m.username).slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold text-sky-300">
+                  {m.display_name || m.username}{" "}
+                  <span className="font-normal text-slate-500">{timeLabel(m.created_at)}</span>
+                </p>
+                <p
+                  className={`mt-0.5 inline-block max-w-[150px] break-words rounded-lg px-2 py-1 text-xs ${
+                    own ? "bg-sky-600/70 text-white" : "bg-white/10 text-slate-100"
+                  }`}
+                >
+                  {m.message}
+                </p>
+              </div>
             </div>
           );
         })}
       </div>
 
-      {error && <p className="px-3 pb-1 text-xs text-red-400">{error}</p>}
+      {error && <p className="px-2.5 pb-1 text-[11px] text-red-400">{error}</p>}
 
-      <div className="flex items-center gap-2 border-t border-white/10 p-2">
+      <div className="flex items-center gap-1.5 border-t border-white/10 p-1.5">
         <input
           type="text"
           value={draft}
@@ -129,16 +160,16 @@ export function ChatBox() {
           onKeyUp={(e) => e.stopPropagation()}
           maxLength={240}
           placeholder="Type a message…"
-          className="min-w-0 flex-1 rounded-full border border-white/15 bg-slate-950/60 px-3 py-1.5 text-sm text-slate-50 outline-none placeholder:text-slate-500 focus:border-sky-400/60"
+          className="min-w-0 flex-1 rounded-full border border-white/15 bg-slate-950/60 px-2.5 py-1 text-xs text-slate-50 outline-none placeholder:text-slate-500 focus:border-sky-400/60"
         />
         <button
           type="button"
           onClick={() => void onSend()}
           disabled={sending || !draft.trim()}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white transition-colors hover:bg-sky-400 disabled:opacity-50"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white transition-colors hover:bg-sky-400 disabled:opacity-50"
           title="Send"
         >
-          <Send className="h-4 w-4" aria-hidden />
+          <Send className="h-3.5 w-3.5" aria-hidden />
         </button>
       </div>
     </div>
