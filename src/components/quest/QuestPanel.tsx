@@ -35,15 +35,30 @@ export function QuestPanel() {
     if (ok) {
       toast.success(
         wasLastQuest
-          ? `Claimed +${quest.rewardCoins.toLocaleString()} coins — that was the last quest!`
-          : `Claimed +${quest.rewardCoins.toLocaleString()} coins. Next quest unlocked.`,
+          ? `Claimed +${quest.rewardCoins.toLocaleString()} coins & +${quest.rewardXp.toLocaleString()} XP — that was the last quest!`
+          : `Claimed +${quest.rewardCoins.toLocaleString()} coins & +${quest.rewardXp.toLocaleString()} XP. Next quest unlocked.`,
       );
     } else {
       toast.error(useQuestStore.getState().error ?? "Could not claim the reward.");
     }
   };
 
-  const percent = quest ? Math.min(100, (quest.progressValue / quest.requirement.qty) * 100) : 0;
+  const requirementLabel = (type: string) => {
+    switch (type) {
+      case "catch_count":
+        return "Catch";
+      case "sell_count":
+        return "Sell";
+      case "buy_rod":
+        return "Buy rod";
+      case "buy_bait":
+        return "Buy bait";
+      case "buy_boat":
+        return "Buy boat";
+      default:
+        return type;
+    }
+  };
   // "All done" only shows once we've actually loaded and status says so —
   // see the note in quest.functions.ts: a null quest is NOT how completion
   // is represented, `status === "claimed"` on quest 10 is.
@@ -58,8 +73,8 @@ export function QuestPanel() {
             Quests
           </DialogTitle>
           <DialogDescription>
-            One quest at a time — catch fish to make progress. Rewards pay coins only,
-            not gold or XP.
+            One quest at a time — every quest can mix catching, selling, and gear
+            upgrades. Rewards pay both coins and XP.
           </DialogDescription>
         </DialogHeader>
 
@@ -90,19 +105,38 @@ export function QuestPanel() {
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{quest.description}</p>
 
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-sky-500 transition-[width] duration-500"
-                  style={{ width: `${percent}%` }}
-                />
+              <div className="mt-3 space-y-2.5">
+                {quest.requirements.map((req, i) => {
+                  const value = Math.min(quest.progressValues[i] ?? 0, req.qty);
+                  const pct = Math.min(100, (value / req.qty) * 100);
+                  const done = value >= req.qty;
+                  return (
+                    <div key={i}>
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>
+                          {requirementLabel(req.type)}{" "}
+                          <span className="font-medium text-foreground/90">{req.key}</span>
+                        </span>
+                        <span className={`tabular-nums ${done ? "text-emerald-400 font-semibold" : ""}`}>
+                          {value} / {req.qty}
+                        </span>
+                      </div>
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full transition-[width] duration-500 ${
+                            done ? "bg-emerald-500" : "bg-sky-500"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
-                <span>
-                  {Math.min(quest.progressValue, quest.requirement.qty)} / {quest.requirement.qty}
-                </span>
-                <span className="font-semibold text-amber-400">
-                  +{quest.rewardCoins.toLocaleString()} coins
-                </span>
+
+              <div className="mt-3 flex items-center justify-end gap-3 text-xs font-semibold">
+                <span className="text-amber-400">+{quest.rewardCoins.toLocaleString()} coins</span>
+                <span className="text-sky-400">+{quest.rewardXp.toLocaleString()} XP</span>
               </div>
             </div>
 

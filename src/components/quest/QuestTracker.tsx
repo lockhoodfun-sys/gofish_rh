@@ -1,8 +1,25 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { Fish, Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { useProfileStore } from "@/hooks/useProfileStore";
 import { useQuestStore } from "@/hooks/useQuestStore";
+
+function requirementLabel(type: string) {
+  switch (type) {
+    case "catch_count":
+      return "Catch";
+    case "sell_count":
+      return "Sell";
+    case "buy_rod":
+      return "Buy rod";
+    case "buy_bait":
+      return "Buy bait";
+    case "buy_boat":
+      return "Buy boat";
+    default:
+      return type;
+  }
+}
 
 /** Always-on quest HUD docked top-right (Fisch-style tracker) — shows the
  * active quest's progress bar without requiring a click to open anything.
@@ -30,9 +47,6 @@ export function QuestTracker() {
 
   const allDone = loaded && quest?.status === "claimed" && quest.orderIndex === 10;
   const claimable = quest?.status === "completed_unclaimed";
-  const percent = quest
-    ? Math.min(100, (quest.progressValue / quest.requirement.qty) * 100)
-    : 100;
 
   const onClaim = async () => {
     if (!quest) return;
@@ -41,8 +55,8 @@ export function QuestTracker() {
     if (ok) {
       toast.success(
         wasLastQuest
-          ? `Claimed +${quest.rewardCoins.toLocaleString()} coins — that was the last quest!`
-          : `Claimed +${quest.rewardCoins.toLocaleString()} coins. Next quest unlocked.`,
+          ? `Claimed +${quest.rewardCoins.toLocaleString()} coins & +${quest.rewardXp.toLocaleString()} XP — that was the last quest!`
+          : `Claimed +${quest.rewardCoins.toLocaleString()} coins & +${quest.rewardXp.toLocaleString()} XP. Next quest unlocked.`,
       );
     } else {
       toast.error(useQuestStore.getState().error ?? "Could not claim the reward.");
@@ -71,27 +85,39 @@ export function QuestTracker() {
             {quest.title}
           </p>
 
-          <div className="relative mt-2.5">
-            <div className="h-3 overflow-hidden rounded-full bg-slate-950/70 ring-1 ring-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-sky-600 via-sky-400 to-cyan-300 shadow-[0_0_10px_3px_rgba(56,189,248,0.7)] transition-[width] duration-500"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-            <div
-              className="absolute top-1/2 flex h-5 w-5 -translate-y-1/2 -translate-x-1/2 items-center justify-center rounded-full bg-sky-400 ring-2 ring-white/50 shadow-[0_0_10px_4px_rgba(56,189,248,0.9)] transition-[left] duration-500"
-              style={{ left: `${percent}%` }}
-            >
-              <Fish className="h-3 w-3 text-slate-900" aria-hidden />
-            </div>
+          <div className="mt-2 space-y-1.5">
+            {quest.requirements.map((req, i) => {
+              const value = Math.min(quest.progressValues[i] ?? 0, req.qty);
+              const pct = Math.min(100, (value / req.qty) * 100);
+              const done = value >= req.qty;
+              return (
+                <div key={i}>
+                  <div className="relative h-2 overflow-hidden rounded-full bg-slate-950/70 ring-1 ring-white/10">
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-500 ${
+                        done
+                          ? "bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.7)]"
+                          : "bg-gradient-to-r from-sky-600 via-sky-400 to-cyan-300 shadow-[0_0_8px_2px_rgba(56,189,248,0.7)]"
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="mt-0.5 flex items-center justify-between text-[10px] font-bold tabular-nums text-white">
+                    <span className="truncate">
+                      {requirementLabel(req.type)} {req.key}
+                    </span>
+                    <span>
+                      {value}/{req.qty}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div className="mt-1 flex items-center justify-between text-[11px] font-bold tabular-nums text-white">
-            <span>
-              {Math.min(quest.progressValue, quest.requirement.qty)} / {quest.requirement.qty}
-            </span>
-            <span className="font-bold text-amber-300">
-              +{quest.rewardCoins.toLocaleString()}
-            </span>
+
+          <div className="mt-1.5 flex items-center justify-between text-[11px] font-bold tabular-nums text-amber-300">
+            <span>+{quest.rewardCoins.toLocaleString()}</span>
+            <span className="text-sky-300">+{quest.rewardXp.toLocaleString()} XP</span>
           </div>
 
           {claimable && (

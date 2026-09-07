@@ -76,6 +76,10 @@ export function NpcDialog() {
       const updated = await sellFish({ data: { proof, ...payload } });
       if (updated) setProfile(updated);
       await refresh();
+      // Selling fish can advance quest progress (sell_count requirements)
+      // server-side — refresh the quest HUD so it isn't stale.
+      const { useQuestStore } = await import("@/hooks/useQuestStore");
+      void useQuestStore.getState().refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "The sale failed. Try again.");
     } finally {

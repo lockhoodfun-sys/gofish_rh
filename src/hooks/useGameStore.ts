@@ -131,6 +131,11 @@ function syncCatchToProfile(weatherKind: string, onSettled: (result: FishCatch |
       }
       const { useInventoryStore } = await import("@/hooks/useInventoryStore");
       await useInventoryStore.getState().refresh();
+      // Catching fish can advance quest progress (catch_count requirements)
+      // server-side — refresh the quest HUD so it doesn't sit stale until
+      // the player reopens the panel or reloads the page.
+      const { useQuestStore } = await import("@/hooks/useQuestStore");
+      void useQuestStore.getState().refresh();
       onSettled({
         speciesId: result.speciesId,
         name: result.speciesName,

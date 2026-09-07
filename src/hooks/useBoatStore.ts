@@ -72,6 +72,10 @@ export const useBoatStore = create<BoatStore>((set, get) => ({
       const profile = await buyBoat({ data: { proof, boatId } });
       if (profile) useProfileStore.getState().setProfile(profile as never);
       await get().refresh();
+      // Buying a boat can advance quest progress (buy_boat requirements)
+      // server-side — refresh the quest HUD so it isn't stale.
+      const { useQuestStore } = await import("@/hooks/useQuestStore");
+      void useQuestStore.getState().refresh();
     } catch (e) {
       set({ error: e instanceof Error ? e.message : "The purchase failed." });
     } finally {

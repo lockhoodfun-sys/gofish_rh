@@ -64,6 +64,10 @@ export const useBaitStore = create<BaitStore>((set, get) => ({
       const profile = await buyBait({ data: { proof, baitId } });
       if (profile) useProfileStore.getState().setProfile(profile as never);
       await get().refresh();
+      // Buying bait can advance quest progress (buy_bait requirements)
+      // server-side — refresh the quest HUD so it isn't stale.
+      const { useQuestStore } = await import("@/hooks/useQuestStore");
+      void useQuestStore.getState().refresh();
     } catch (e) {
       set({ error: e instanceof Error ? e.message : "The purchase failed." });
     } finally {

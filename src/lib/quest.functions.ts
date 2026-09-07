@@ -11,14 +11,25 @@ const proofSchema = z.object({
 
 type Profile = Tables<"profiles">;
 
+/** One quest can demand several things at once (catch + sell + gear
+ * upgrades). `key` is a rarity for catch_count/sell_count, or a rod/bait/boat
+ * tier id for buy_rod/buy_bait/buy_boat. */
+export interface QuestRequirement {
+  type: "catch_count" | "sell_count" | "buy_rod" | "buy_bait" | "buy_boat";
+  key: string;
+  qty: number;
+}
+
 export interface QuestProgressView {
   questId: string;
   orderIndex: number;
   title: string;
   description: string;
-  requirement: { type: string; rarity: string; qty: number };
+  requirements: QuestRequirement[];
   rewardCoins: number;
-  progressValue: number;
+  rewardXp: number;
+  /** Same length/order as `requirements` — progressValues[i] tracks requirements[i]. */
+  progressValues: number[];
   status: "active" | "completed_unclaimed" | "claimed";
 }
 
@@ -36,9 +47,10 @@ export const getQuestProgress = createServerFn({ method: "POST" })
         order_index: number;
         title: string;
         description: string;
-        requirement: { type: string; rarity: string; qty: number };
+        requirement: QuestRequirement[];
         reward_coins: number;
-        progress_value: number;
+        reward_xp: number;
+        progress_value: number[];
         status: string;
       }>
     >("get_quest_progress", { _wallet: wallet });
@@ -59,9 +71,10 @@ export const getQuestProgress = createServerFn({ method: "POST" })
       orderIndex: row.order_index,
       title: row.title,
       description: row.description,
-      requirement: row.requirement,
+      requirements: row.requirement,
       rewardCoins: Number(row.reward_coins),
-      progressValue: Number(row.progress_value),
+      rewardXp: Number(row.reward_xp),
+      progressValues: (row.progress_value ?? []).map(Number),
       status: row.status as QuestProgressView["status"],
     };
   });
