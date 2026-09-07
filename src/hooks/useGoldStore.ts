@@ -16,6 +16,7 @@ interface GoldStore {
   setPanelOpen: (open: boolean) => void;
   refresh: () => Promise<void>;
   requestWithdrawal: (amount: number) => Promise<boolean>;
+  cancelWithdrawal: (withdrawalId: string) => Promise<boolean>;
 }
 
 export const useGoldStore = create<GoldStore>((set, get) => ({
@@ -69,6 +70,29 @@ export const useGoldStore = create<GoldStore>((set, get) => ({
       set({
         submitting: false,
         error: e instanceof Error ? e.message : "The withdrawal request failed.",
+      });
+      return false;
+    }
+  },
+  cancelWithdrawal: async (withdrawalId) => {
+    const proof = useProfileStore.getState().proof;
+    if (!proof) return false;
+    set({ submitting: true, error: null });
+    try {
+      const { cancelWithdrawal: cancelWithdrawalFn } = await import("@/lib/withdrawal.functions");
+      await cancelWithdrawalFn({ data: { proof, withdrawalId } });
+      // Gold balance moved back — pull the fresh profile too, same as
+      // requestWithdrawal does on the way out.
+      const { ensureProfile } = await import("@/lib/profile.functions");
+      const profile = await ensureProfile({ data: proof });
+      useProfileStore.getState().setProfile(profile);
+      await get().refresh();
+      set({ submitting: false });
+      return true;
+    } catch (e) {
+      set({
+        submitting: false,
+        error: e instanceof Error ? e.message : "Could not cancel the withdrawal.",
       });
       return false;
     }

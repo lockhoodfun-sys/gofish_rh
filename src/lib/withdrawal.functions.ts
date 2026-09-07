@@ -79,3 +79,23 @@ export const getMyWithdrawals = createServerFn({ method: "POST" })
     if (res.error) throw new Error(res.error.message);
     return res.data as WithdrawalRequest[];
   });
+
+const cancelSchema = z.object({ proof: proofSchema, withdrawalId: z.string().uuid() });
+
+/** Player self-cancel of their own still-pending withdrawal request — gold
+ * is refunded immediately, no need to wait for the auto-expire cron or an
+ * admin. cancel_withdrawal (SQL) re-checks ownership and status regardless
+ * of what the client sends. */
+export const cancelWithdrawal = createServerFn({ method: "POST" })
+  .validator((input: unknown) => cancelSchema.parse(input))
+  .handler(async ({ data }): Promise<WithdrawalRequest> => {
+    const { verifyWalletProof } = await import("./walletProof.server");
+    const wallet = await verifyWalletProof(data.proof);
+
+    const res = await rpc<WithdrawalRequest>("cancel_withdrawal", {
+      _wallet: wallet,
+      _withdrawal_id: data.withdrawalId,
+    });
+    if (res.error) throw new Error(res.error.message);
+    return res.data as WithdrawalRequest;
+  });

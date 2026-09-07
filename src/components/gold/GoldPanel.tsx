@@ -17,7 +17,8 @@ import { useGoldStore } from "@/hooks/useGoldStore";
 
 function statusTone(status: string) {
   if (status === "paid") return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
-  if (status === "rejected") return "border-rose-500/40 bg-rose-500/10 text-rose-300";
+  if (status === "rejected" || status === "expired") return "border-rose-500/40 bg-rose-500/10 text-rose-300";
+  if (status === "cancelled") return "border-muted-foreground/30 bg-muted text-muted-foreground";
   return "border-amber-500/40 bg-amber-500/10 text-amber-300";
 }
 
@@ -33,8 +34,10 @@ export function GoldPanel() {
   const storeError = useGoldStore((s) => s.error);
   const refresh = useGoldStore((s) => s.refresh);
   const requestWithdrawal = useGoldStore((s) => s.requestWithdrawal);
+  const cancelWithdrawal = useGoldStore((s) => s.cancelWithdrawal);
 
   const [amount, setAmount] = useState("");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (panelOpen && proof) void refresh();
@@ -75,6 +78,17 @@ export function GoldPanel() {
     } else {
       toast.error(useGoldStore.getState().error ?? "The withdrawal request failed.");
     }
+  };
+
+  const onCancel = async (withdrawalId: string) => {
+    setCancellingId(withdrawalId);
+    const ok = await cancelWithdrawal(withdrawalId);
+    if (ok) {
+      toast.success("Withdrawal cancelled — gold refunded.");
+    } else {
+      toast.error(useGoldStore.getState().error ?? "Could not cancel the withdrawal.");
+    }
+    setCancellingId(null);
   };
 
   return (
@@ -172,7 +186,7 @@ export function GoldPanel() {
                   {withdrawals.map((w) => (
                     <div
                       key={w.id}
-                      className="flex items-center justify-between rounded-lg border border-border px-2.5 py-1.5 text-xs"
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border px-2.5 py-1.5 text-xs"
                     >
                       <span className="tabular-nums font-semibold">{Number(w.gold_amount).toLocaleString()} gold</span>
                       <span className="text-muted-foreground">
@@ -181,6 +195,16 @@ export function GoldPanel() {
                       <span className={`rounded-md border px-1.5 py-0.5 font-semibold ${statusTone(w.status)}`}>
                         {w.status}
                       </span>
+                      {w.status === "pending" && (
+                        <button
+                          type="button"
+                          className="text-muted-foreground underline-offset-2 hover:text-destructive hover:underline disabled:opacity-50"
+                          disabled={cancellingId === w.id}
+                          onClick={() => onCancel(w.id)}
+                        >
+                          {cancellingId === w.id ? "Cancelling…" : "Cancel"}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
